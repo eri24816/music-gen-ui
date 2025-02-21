@@ -1,6 +1,6 @@
 # vue-fastapi-template
 
-A starting point for a vue frontend + fastapi backend repo.
+A starting point for a vue frontend + fastapi backend repo. It uses ts, vite, and uvicorn.
 
 ## install
 
