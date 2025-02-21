@@ -1,3 +1,7 @@
+# vue-fastapi-template
+
+A starting point for a vue frontend + fastapi backend repo.
+
 ## install
 
 ```bash
@@ -10,6 +14,9 @@ npm install
 
 ```bash
 uvicorn back.app.main:app --reload
+```
+
+```bash
 cd front
 npm run dev
 ```
