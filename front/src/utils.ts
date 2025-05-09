@@ -253,3 +253,57 @@ export class Cooldown {
         }
     }
 }
+
+function labToXyz(l: number, a: number, b: number) {
+  const y = (l + 16) / 116;
+  const x = a / 500 + y;
+  const z = y - b / 200;
+
+  const [xr, yr, zr] = [x, y, z].map(v => {
+    const v3 = v ** 3;
+    return v3 > 0.008856 ? v3 : (v - 16 / 116) / 7.787;
+  });
+
+  // D65 reference white
+  return {
+    x: xr * 95.047,
+    y: yr * 100.0,
+    z: zr * 108.883
+  };
+}
+
+function xyzToRgb(x: number, y: number, z: number) {
+  x /= 100;
+  y /= 100;
+  z /= 100;
+
+  let r = x * 3.2406 + y * -1.5372 + z * -0.4986;
+  let g = x * -0.9689 + y * 1.8758 + z * 0.0415;
+  let b = x * 0.0557 + y * -0.2040 + z * 1.0570;
+
+  const compand = c => {
+    return c > 0.0031308
+      ? 1.055 * Math.pow(c, 1 / 2.4) - 0.055
+      : 12.92 * c;
+  };
+
+  r = compand(r);
+  g = compand(g);
+  b = compand(b);
+
+  return {
+    r: Math.min(255, Math.max(0, r * 255)),
+    g: Math.min(255, Math.max(0, g * 255)),
+    b: Math.min(255, Math.max(0, b * 255))
+  };
+}
+
+function labToRgb(l: number, a: number, b: number) {
+    const xyz = labToXyz(l, a, b);
+    return xyzToRgb(xyz.x, xyz.y, xyz.z);
+}
+
+export function labToRgbString(l: number, a: number, b: number) {
+    const rgb = labToRgb(l, a, b);
+    return `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+}

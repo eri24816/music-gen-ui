@@ -52,20 +52,21 @@ onMounted(() => {
 .file-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 16px;
     background: rgba(0, 0, 0, 0.4);
     backdrop-filter: blur(8px);
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 8px 0px;
+    min-width: 100px;
+    margin-right: 16px;
+    
 }
 
 .file-btn {
     background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 0;
     color: rgba(255, 255, 255, 0.8);
-    padding: 8px 16px;
-    border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s ease;
     text-align: left;

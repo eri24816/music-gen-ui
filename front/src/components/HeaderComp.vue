@@ -1,7 +1,7 @@
 <template>
     <div class="header-container">
         <h1 class="title">Midi Demo Page</h1>
-        <p class="subtitle">by eri24816</p>
+        <p class="subtitle"></p>
         <!-- <div class="links">
             <a href="https://github.com/your-repo" target="_blank" class="link">View on GitHub</a>
         </div> -->
@@ -11,8 +11,8 @@
 <style scoped>
 .header-container {
     text-align: center;
-    padding: 30px 20px;
-    background: linear-gradient(120deg, #1a365d, #967a64);
+    padding: 60px 20px;
+    background: linear-gradient(120deg, #1a365d, #5a2727);
     color: white;
 }
 
