@@ -1,5 +1,5 @@
 {
-  "name": "project-name",
+  "name": "midi-demo-page",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,16 @@
     "type-check": "vue-tsc --build"
   },
   "dependencies": {
-    "vue": "^3.5.13"
+    "@magenta/music": "^1.22.1",
+    "@tonejs/midi": "git+https://github.com/eri24816/Midi.git",
+    "@tonejs/piano": "^0.2.1",
+    "@vueuse/core": "^11.2.0",
+    "axios": "^1.7.7",
+    "buffer": "^6.0.3",
+    "events": "^3.3.0",
+    "pinia": "^2.1.7",
+    "vue": "^3.4.29",
+    "vue-router": "^4.3.3"
   },
   "devDependencies": {
     "@tsconfig/node22": "^22.0.0",
