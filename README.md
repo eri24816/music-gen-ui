@@ -18,12 +18,12 @@ resource/
 
     grouped_section_1/
         model_A/
-            A_1.mid
-            A_2.mid
+            1.mid
+            2.mid
             ...
         model_B/
-            B_1.mid
-            B_2.mid
+            1.mid
+            2.mid
             ...
     ...
 ```
