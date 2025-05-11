@@ -1,24 +1,46 @@
-# vue-fastapi-template
+# Midi Demo Page Template
 
-A starting point for a vue frontend + fastapi backend repo. It uses ts, vite, and uvicorn.
+Plays and visualizes midi files on github pages. Only single-instrument midi files are supported.
 
-## install
-1. Replace all occurrences of `project-name` in all files with the actual name of the project.
-2. Run the following commands to install the dependencies.
+## Usage
+
+1. Put your midi files in the `resource` folder with the following structure:
+
+```
+resource/
+
+    settings.json
+
+    simple_section_1/
+        1.mid
+        2.mid
+        ...
+
+    grouped_section_1/
+        model_A/
+            A_1.mid
+            A_2.mid
+            ...
+        model_B/
+            B_1.mid
+            B_2.mid
+            ...
+    ...
+```
+
+2. Edit the `settings.json` file to customize the page.
+
+3. Push your changes to github.
+
+4. The page will be deployed to `gh-pages` branch by github actions.
+
+5. Publish the page with github pages.
+
+![Image](https://i.imgur.com/OrlRIt1.png)
+
+## Build locally
 
 ```bash
-pip install -e back
-cd front
 npm install
-```
-
-## run
-
-```bash
-uvicorn back.app.main:app --reload
-```
-
-```bash
-cd front
-npm run dev
+npm build
 ```
