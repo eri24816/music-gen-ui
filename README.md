@@ -2,6 +2,8 @@
 
 Plays and visualizes midi files on github pages. Only single-instrument midi files are supported.
 
+![Image](https://i.imgur.com/lvk5DM3.png)
+
 ## Usage
 
 1. Put your midi files in the `resource` folder with the following structure:
