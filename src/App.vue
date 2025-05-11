@@ -84,14 +84,16 @@ function itemNameTrim(name: string) {
 
 // Add settings type
 interface SectionSettings {
+    name: string
     description: string
+    order: number
 }
 
 const settings = ref<{
     title: string
     description: string
-    sections: Record<string, SectionSettings>
-}>({title: "", description: "", sections: {}})
+    sections: SectionSettings[]
+}>({title: "", description: "", sections: []})
 
 // Add markdown rendering function
 function renderMarkdown(text: string): string {
@@ -109,7 +111,20 @@ onMounted(async () => {
 
     const sectionNames = (await ls('.')).dirs
     // sections.value = await Promise.all(res.dirs.map(async (dir: string) => ({ dir, items: (await ls(`midi/${dir}`)).files})))
+    
+    const sectionToOrderMap = new Map<string, number>()
+    // default order is 0
     for (const sectionName of sectionNames) {
+        sectionToOrderMap.set(sectionName, 0)
+    }
+
+    for (const section of settings.value.sections) {
+        sectionToOrderMap.set(section.name, section.order)
+    }
+
+    const sortedSections = sectionNames.sort((a, b) => sectionToOrderMap.get(a)! - sectionToOrderMap.get(b)!)
+    
+    for (const sectionName of sortedSections) {
         const lsResult = await ls(`${sectionName}`)
         if (lsResult.dirs.length > 0) {
             const memberNames = lsResult.dirs
