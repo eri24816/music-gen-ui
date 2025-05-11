@@ -24,18 +24,6 @@ jobs:
         working-directory: front
         run: npm run build
 
-      - name: Generate list.json
-        working-directory: resource
-        run: python generate_list.py
-
-      - name: Check list.json
-        working-directory: resource
-        run: cat list.json
-
-      - name: Move resource to dist
-        working-directory: .
-        run: mv resource front/dist/
-
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:

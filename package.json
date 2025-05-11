@@ -5,9 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
-    "build-only": "vite build",
+    "build": "vite build && node generate_list.js && cp -r resource dist/resource",
     "type-check": "vue-tsc --build"
   },
   "dependencies": {
@@ -18,6 +17,7 @@
     "axios": "^1.7.7",
     "buffer": "^6.0.3",
     "events": "^3.3.0",
+    "marked": "^15.0.11",
     "pinia": "^2.1.7",
     "vue": "^3.4.29",
     "vue-router": "^4.3.3"

@@ -28,6 +28,6 @@ export const player = new mm.SoundFontPlayer(
     callback
 );
 
-player.loadAllSamples().then(() => {
+player.loadAllSamples(0).then(() => {
     playerState.isReady.value = true;
 });

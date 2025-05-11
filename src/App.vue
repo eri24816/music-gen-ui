@@ -1,14 +1,16 @@
 <template>
     <div class="app">
-        <HeaderComp />
+        <HeaderComp :title="settings.title" :description="settings.description" />
         <div class="section" v-for="section in sections" :key="section.sectionName">
-            <h2>{{ section.sectionName }}</h2>
-            <p class="section-description" v-if="sectionDescriptions[section.sectionName]">
-                {{ sectionDescriptions[section.sectionName].description }}
-            </p>
+            <h2 v-html="renderMarkdown(section.sectionName)"></h2>
+            <p 
+                class="section-description" 
+                v-if="settings.sections[section.sectionName]"
+                v-html="renderMarkdown(settings.sections[section.sectionName].description)"
+            ></p>
             <div class="section-content" v-if="isSection(section)">
                 <TabSwitcher :files="section.items" @select="(file) => handleFileSelect(file, section.sectionName)">
-                    <PianorollEditor ref="editors" class="editor" :minPitch="21" :maxPitch="108"></PianorollEditor>
+                    <PianorollEditor ref="editors" class="editor" :minPitch="21" :maxPitch="108" :editable="true"></PianorollEditor>
                 </TabSwitcher>
             </div>
             <div class="section-content" v-else>
@@ -21,15 +23,18 @@
                 </TabSwitcher>
             </div>
         </div>
+        <FooterComp />
     </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { marked } from 'marked'
 import PianorollEditor from './components/PianorollEditor.vue'
 import HeaderComp from './components/HeaderComp.vue'
 import TabSwitcher from './components/TabSwitcher.vue'
 import EditorGroup from './components/EditorGroup.vue'
+import FooterComp from './components/FooterComp.vue'
 
 const editors = ref<InstanceType<typeof PianorollEditor|typeof EditorGroup>[]>([])
 
@@ -69,9 +74,6 @@ async function handleGroupFileSelect(file: string, section: GroupedSection) {
 let listJson: Record<string, { dirs: string[], files: string[] }> | null = null
 
 async function ls(path: string) {
-    if (!listJson) {
-        listJson = await fetch('resource/list.json').then(res => res.json())
-    }
     return listJson![path]
 }
 
@@ -85,20 +87,26 @@ interface SectionSettings {
     description: string
 }
 
-const sectionDescriptions = ref<Record<string, SectionSettings>>({})
+const settings = ref<{
+    title: string
+    description: string
+    sections: Record<string, SectionSettings>
+}>({title: "", description: "", sections: {}})
+
+// Add markdown rendering function
+function renderMarkdown(text: string): string {
+    return marked(text, { breaks: true })
+}
 
 onMounted(async () => {
+    listJson = await fetch('resource/list.json').then(res => res.json())
     // Load settings
-    try {
-        const settingsResponse = await fetch('api/resource/settings.json')
-        if (settingsResponse.ok) {
-            sectionDescriptions.value = await settingsResponse.json()
-        }
-    } catch (e) {
-        console.error('Failed to load settings:', e)
+    const settingsResponse = await fetch('resource/settings.json')
+    if (settingsResponse.ok) {
+        const payload = await settingsResponse.json()
+        settings.value = payload
     }
 
-    // editor.value!.loadMidiFile('api/resource/test.mid');
     const sectionNames = (await ls('.')).dirs
     // sections.value = await Promise.all(res.dirs.map(async (dir: string) => ({ dir, items: (await ls(`midi/${dir}`)).files})))
     for (const sectionName of sectionNames) {
@@ -121,6 +129,15 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+:deep(a) {
+    color: #58a6ff;
+    text-decoration: none;
+}
+
+:deep(a:hover) {
+    text-decoration: underline;
+}
+
 .app {
     flex-direction: column;
     padding-bottom: 20px;
@@ -144,13 +161,11 @@ h2 {
     padding: 0 60px;
 }
 
-
 .section-description {
     padding: 0px 140px 20px 140px;
     margin: -10px 0 20px 0;
     color: rgba(255, 255, 255, 0.7);
     font-size: 14px;
-    white-space: pre-line; /* Preserves line breaks from settings */
 }
 .section{
     margin: 100px 0;
