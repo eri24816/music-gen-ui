@@ -10,7 +10,7 @@
             ></p>
             <div class="section-content" v-if="isSection(section)">
                 <TabSwitcher :files="section.items" @select="(file) => handleFileSelect(file, section.sectionName)">
-                    <PianorollEditor ref="editors" class="editor" :minPitch="21" :maxPitch="108" :editable="true"></PianorollEditor>
+                    <PianorollEditor ref="editors" class="editor" :minPitch="21" :maxPitch="108" :editable="false"></PianorollEditor>
                 </TabSwitcher>
             </div>
             <div class="section-content" v-else>
