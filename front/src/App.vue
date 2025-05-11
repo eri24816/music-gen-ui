@@ -46,11 +46,11 @@ function handleFileSelect(file: string, dir: string, groupName?: string) {
     console.log(selectedSectionId)
     let path: string
     if (groupName) {
-        path = `api/resource/midi/${dir}/${groupName}/${file}`
+        path = `resource/${dir}/${groupName}/${file}`
     } else {
-        path = `api/resource/midi/${dir}/${file}`
+        path = `resource/${dir}/${file}`
     }
-    editors.value[selectedSectionId].loadMidiFile(path)
+    (editors.value[selectedSectionId] as InstanceType<typeof PianorollEditor>).loadMidiFile(path)
 }
 
 async function handleGroupFileSelect(file: string, section: GroupedSection) {
@@ -61,13 +61,18 @@ async function handleGroupFileSelect(file: string, section: GroupedSection) {
     if (!editorGroup) return
 
     for (const memberName of section.groupMembers) {
-        const path = `api/resource/midi/${section.sectionName}/${memberName}/${file}`
+        const path = `resource/${section.sectionName}/${memberName}/${file}`
         await editorGroup.loadMidiFile(memberName, path)
     }
 }
 
-function ls(path: string) {
-    return fetch(`api/resource_ls/${path}`).then(res => res.json())
+let listJson: Record<string, { dirs: string[], files: string[] }> | null = null
+
+async function ls(path: string) {
+    if (!listJson) {
+        listJson = await fetch('resource/list.json').then(res => res.json())
+    }
+    return listJson![path]
 }
 
 function itemNameTrim(name: string) {
@@ -94,15 +99,15 @@ onMounted(async () => {
     }
 
     // editor.value!.loadMidiFile('api/resource/test.mid');
-    const sectionNames = (await ls('midi')).dirs
+    const sectionNames = (await ls('.')).dirs
     // sections.value = await Promise.all(res.dirs.map(async (dir: string) => ({ dir, items: (await ls(`midi/${dir}`)).files})))
     for (const sectionName of sectionNames) {
-        const lsResult = await ls(`midi/${sectionName}`)
+        const lsResult = await ls(`${sectionName}`)
         if (lsResult.dirs.length > 0) {
             const memberNames = lsResult.dirs
             const allGroups = new Set<string>()
             for (const memberName of memberNames) {
-                for (const item of (await ls(`midi/${sectionName}/${memberName}`)).files) {
+                for (const item of (await ls(`${sectionName}/${memberName}`)).files) {
                     allGroups.add(itemNameTrim(item))
                 }
             }

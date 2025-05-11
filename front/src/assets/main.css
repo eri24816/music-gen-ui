@@ -17,3 +17,21 @@ button {
     padding: 8px 16px;
     border-radius: 4px;
 }
+
+/* dark scrollbar */
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #121212;
+}
+
+
+::-webkit-scrollbar-thumb {
+    background: #262626;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #333;
+}

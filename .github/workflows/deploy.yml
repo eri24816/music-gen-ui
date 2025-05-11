@@ -1,0 +1,43 @@
+name: Build and Deploy
+on:
+  push:
+    branches: [ main ]  # or your default branch name
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        working-directory: front
+        run: npm install
+
+      - name: Build
+        working-directory: front
+        run: npm run build
+
+      - name: Generate list.json
+        working-directory: resource
+        run: python generate_list.py
+
+      - name: Check list.json
+        working-directory: resource
+        run: cat list.json
+
+      - name: Move resource to dist
+        working-directory: .
+        run: mv resource front/dist/
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: front/dist 

@@ -20,13 +20,14 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
       }
-    }
+    },
+    allowedHosts: ['*']
   },
   define: {
     // By default, Vite doesn't include shims for NodeJS/
     // necessary for segment analytics lib to work
     global: {},
   },
+  base: './',
 })

@@ -25,6 +25,8 @@ import { now } from "tone"
 import * as mm from '@magenta/music'
 import { player, playerState } from "@/player"
 
+import { Midi } from "@tonejs/midi/src/Midi";
+
 interface DragBehavior {
     mouseDown(event: MouseEvent): void
     mouseMove(event: MouseEvent): void
@@ -59,7 +61,9 @@ const emit = defineEmits([
 const pianorollCanvas = ref<HTMLCanvasElement | null>(null)
 let ctx: CanvasRenderingContext2D | null = null
 let scaleX = 10
+let oldScaleX = 10
 let shiftX = 10
+let oldShiftX = 10
 let gap = 3
 let pianoroll = ref<Pianoroll>(new Pianoroll(props.midiData))
 let cursorPosition = 0
@@ -70,7 +74,7 @@ const numPitches = props.maxPitch - props.minPitch + 1
 const editorDiv = ref<HTMLDivElement | null>(null)
 let isDragging = false
 const focused = ref(false)
-
+let midiMarkers: {beat: number, text: string}[] = []
 
 class MoveNoteDragBehavior implements DragBehavior {
     private _note: Note
@@ -184,8 +188,17 @@ const updatePlayerNotes = (): void => {
     player.start({ notes: notes }, undefined, cursorPosition / pianoroll.value.bps + 0.1)
 }
 
-const render = (): void => {
+const render = (notify: boolean = true): void => {
     if (!pianoroll || !ctx || !pianorollCanvas.value) return
+
+    if (oldScaleX != scaleX || oldShiftX != shiftX) {
+        if (notify) {
+            emit("transform", { scaleX, shiftX })
+        }
+        oldScaleX = scaleX
+        oldShiftX = shiftX
+    }
+
     let height = pianorollCanvas.value.clientHeight
     let width = pianorollCanvas.value.clientWidth
     pianorollCanvas.value.height = height
@@ -193,6 +206,34 @@ const render = (): void => {
     // Clear canvas
     ctx.clearRect(0, 0, width, height)
 
+    
+    // Draw markers
+    const markerColors = ["hsl(90, 60%, 20%)", "hsl(180, 60%, 20%)", "hsl(270, 60%, 20%)", "hsl(45, 60%, 20%)","hsl(0, 60%, 20%)",  "hsl(135, 60%, 20%)", "hsl(225, 60%, 20%)", "hsl(315, 60%, 20%)"]
+    // map marker text to color index
+    const markerColorMap = new Map<string, number>()
+    for (let i = 0; i < midiMarkers.length; i++) {
+        const text = midiMarkers[i].text[0]
+        if (!markerColorMap.has(text)) {
+            markerColorMap.set(text, markerColorMap.size % markerColors.length)
+        }
+    }
+    const markerHeight = 10
+    for (let i = 0; i < midiMarkers.length; i++) {
+        const start = midiMarkers[i].beat
+        const end = i==midiMarkers.length-1 ? pianoroll.value.duration : midiMarkers[i+1].beat
+        ctx.beginPath()
+        ctx.fillStyle = markerColors[markerColorMap.get(midiMarkers[i].text[0]) ?? 0]
+        ctx.rect(beatToCanvas(start), height - markerHeight, beatToCanvas(end) - beatToCanvas(start), markerHeight)
+        ctx.fill()
+        ctx.fillStyle = "#FFFFFF"   
+        ctx.font = "12px Arial"
+        ctx.textAlign = "left"
+        ctx.fillText(
+            midiMarkers[i].text,
+            beatToCanvas(start),
+            height - markerHeight/2,
+        )
+    }
     // Draw bar lines
     ctx.strokeStyle = "#333333"
     ctx.fillStyle = "white"
@@ -236,7 +277,7 @@ const render = (): void => {
             ctx.fillText(
                 (i / 4 + 1).toString(),
                 beatToCanvas(i) + 5,
-                height - 5,
+                15,
             )
         }
     }
@@ -250,7 +291,7 @@ const render = (): void => {
         timeUpperBound,
     )) {
         // sustain
-        const hue = (note.pitch % 12) * 30 / 180 * Math.PI // 30 degrees per semitone
+        const hue = (note.pitch % 12) * 30.0 / 180 * Math.PI // 30 degrees per semitone
         let lightness = Math.pow(note.velocity / 127, 2) * 128
         // lightness += Math.abs(hue - 120) * 0.4 * (90 - lightness) / 100
 
@@ -440,7 +481,6 @@ const handleWheel = (event: WheelEvent): void => {
         shiftX = Math.min(shiftX, 100 / scaleX)
     }
     render()
-    emit("transform", { scaleX, shiftX })
 }
 
 const handleMouseDown = (event: MouseEvent): void => {
@@ -499,7 +539,7 @@ const _play = (): void => {
             velocity: note.velocity,
         })
     }
-    const sequence: mm.NoteSequence = {
+    const sequence = {
         notes: notes,
 
     }
@@ -582,6 +622,15 @@ const loadMidiFile = async (fileName: string): Promise<void> => {
     }
     const arrayBuffer = await response.arrayBuffer()
     pianoroll.value = new Pianoroll(arrayBuffer)
+    midiMarkers = []
+    const midi = new Midi(arrayBuffer);
+    for( const event of midi.header.meta) {
+        if (event.type === "marker") {
+            midiMarkers.push({beat: event.ticks / midi.header.ppq, text: event.text})
+        }
+    }
+    console.log(midiMarkers)
+    
     render()
 
 }
@@ -630,9 +679,16 @@ watch(pianoroll, (newVal) => {
     render()
 })
 
+function transform(transform: { scaleX: number, shiftX: number }, notify: boolean = true) {
+    scaleX = transform.scaleX
+    shiftX = transform.shiftX
+    render(notify)
+}
+
 //expose loadMidiFile to parent
 defineExpose({
     loadMidiFile,
+    transform
 })
 </script>
 

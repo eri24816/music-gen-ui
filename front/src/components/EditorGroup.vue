@@ -1,12 +1,13 @@
 <template>
     <div class="editor-group">
-        <div v-for="name in names" :key="name" class="editor-container">
+        <div v-for="(name, index) in names" :key="name" class="editor-container">
             <h3 class="editor-title">{{ name }}</h3>
             <PianorollEditor 
                 ref="editors"
                 class="editor" 
                 :minPitch="21" 
                 :maxPitch="108"
+                @transform="(transform) => handleTransform(transform, index)"
             />
         </div>
     </div>
@@ -24,16 +25,22 @@ const editors = ref<InstanceType<typeof PianorollEditor>[]>([]);
 
 const loadMidiFile = async (name: string, file: string) => {
     const editorIndex = props.names.indexOf(name);
-    if (editorIndex === -1) {
-        console.error(`Editor with name ${name} not found`);
-        return;
-    }
-    
+
     try {
         await editors.value[editorIndex].loadMidiFile(file);
     } catch (e) {
         console.error(`Failed to load MIDI file for ${name}:`, e);
     }
+};
+
+const handleTransform = (transform: { scaleX: number, shiftX: number }, sourceIndex: number) => {
+    if (sourceIndex === -1) return;
+
+    editors.value.forEach((editor, index) => {
+        if (index !== sourceIndex) {
+            editor.transform(transform, false);
+        }
+    });
 };
 
 // Expose the loadMidiFile method to parent components
