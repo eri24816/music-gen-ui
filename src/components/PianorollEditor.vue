@@ -4,14 +4,14 @@
         <canvas class="pianoroll-canvas" ref="pianorollCanvas" @dragover="handleDragOver" @mousedown="handleMouseDown"
             @contextmenu.prevent></canvas>
         <div class="controls">
-            <button class="control-btn" @click.prevent="handlePlayClick" :disabled="!playerState.isReady.value">
-                {{ playerState.isReady.value ? (isPlaying ? "⏹" : "▶") : "Loading soundfont..." }}
+            <button class="control-btn" @click.prevent="handlePlayClick" :disabled="!player.isReady">
+                {{ player.isReady.value ? (isPlaying ? "⏹" : "▶") : "Loading soundfont..." }}
             </button>
             <button class="control-btn" @click.prevent="saveMidi">💾</button>
             <button class="control-btn" @click.prevent="clear" v-if="editable">🗑️</button>
         </div>
 
-        <div class="loading-overlay" v-if="!playerState.isReady.value">
+        <div class="loading-overlay" v-if="!player.isReady.value">
             Loading soundfont...<br>
             May take a while on first load.
         </div>
@@ -22,8 +22,8 @@
 import { ref, onMounted, onUnmounted, watch } from "vue"
 import { labToRgbString, Note, Pianoroll } from "@/utils"
 import { now } from "tone"
-import * as mm from '@magenta/music'
-import { player, playerState } from "@/player"
+import { player } from "@/player"
+import type { INote } from "@/player"
 
 import { Midi } from "@tonejs/midi/src/Midi";
 
@@ -180,12 +180,12 @@ const updatePlayerNotes = (): void => {
     if (!isPlaying.value) {
         return
     }
-    const notes: mm.NoteSequence.INote[] = []
+    const notes: any[] = []
     for (const note of pianoroll.value.getNotes()) {
         notes.push({ pitch: note.pitch, startTime: note.onset / pianoroll.value.bps, endTime: (note.onset + note.duration) / pianoroll.value.bps, velocity: note.velocity })
     }
     player.stop()
-    player.start({ notes: notes }, undefined, cursorPosition / pianoroll.value.bps + 0.1)
+    player.start({ notes: notes }, cursorPosition / pianoroll.value.bps + 0.1)
 }
 
 const render = (notify: boolean = true): void => {
@@ -526,11 +526,12 @@ const playOrStop = (): void => {
         _play()
     }
 }
-let playbackId = Math.random()
+
+let playbackId = 0
 const _play = (): void => {
 
     isPlaying.value = true
-    const notes: mm.NoteSequence.INote[] = []
+    const notes: any[] = []
     for (const note of pianoroll.value.getNotes()) {
         notes.push({
             pitch: note.pitch,
@@ -546,28 +547,27 @@ const _play = (): void => {
     if (player.isPlaying()) {
         player.stop()
     }
-    player.start(sequence, undefined, cursorPosition / pianoroll.value.bps)
-    playerState.time = cursorPosition / pianoroll.value.bps
-    console.log("playing", playerState.time, sequence)
-    playerState.timeVersion++
+    const noteOnCallback = (note: INote) => {
+        let updatedCursorPosition = note.startTime * pianoroll.value.bps
+        if (updatedCursorPosition !== cursorPosition) {
+            cursorPosition = updatedCursorPosition
+        }
+    }
+    playbackId = player.start(sequence, cursorPosition / pianoroll.value.bps, noteOnCallback)
+    player.time = cursorPosition / pianoroll.value.bps
+    console.log("playing", player.time, sequence)
+    player.timeVersion++
     const startTime = Date.now()
-    let timeVersion = playerState.timeVersion
-    playbackId = Math.random()
-    playerState.playbackId = playbackId
+    let timeVersion = player.timeVersion
     // move the cursor in the event loop
     intervalId = setInterval(() => {
-        if (playerState.playbackId !== playbackId) {
+        if (player.playbackId !== playbackId) {
             stop()
             return
         }
         const elapsedTime = Date.now() - startTime
-        if (elapsedTime > 200) {
-            if (playerState.time !== null && playerState.timeVersion > timeVersion) {
-                cursorPosition = playerState.time * pianoroll.value.bps
-                timeVersion = playerState.timeVersion
-            } else {
-                cursorPosition += 0.02 * pianoroll.value.bps
-            }
+        if (elapsedTime > 0) {
+            cursorPosition += 0.02 * pianoroll.value.bps
             keepCursorInScreen()
         }
         render()
@@ -580,7 +580,7 @@ const _stop = (): void => {
         clearInterval(intervalId)
         intervalId = null
     }
-    if (playbackId === playerState.playbackId) {
+    if (playbackId === player.playbackId) {
         player.stop()
     }
     isPlaying.value = false
