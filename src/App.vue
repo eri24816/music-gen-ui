@@ -5,8 +5,8 @@
             <h2 v-html="renderMarkdown(section.sectionName)"></h2>
             <p 
                 class="section-description" 
-                v-if="settings.sections[section.sectionName]"
-                v-html="renderMarkdown(settings.sections[section.sectionName].description)"
+                v-if="sectionInfoDict[section.sectionName]"
+                v-html="renderMarkdown(sectionInfoDict[section.sectionName].description)"
             ></p>
             <div class="section-content" v-if="isSection(section)">
                 <TabSwitcher :files="section.items" @select="(file) => handleFileSelect(file, section.sectionName)">
@@ -95,6 +95,8 @@ const settings = ref<{
     sections: SectionSettings[]
 }>({title: "", description: "", sections: []})
 
+const sectionInfoDict = ref<Record<string, SectionSettings>>({})
+
 // Add markdown rendering function
 function renderMarkdown(text: string): string {
     return marked(text, { breaks: true })
@@ -107,6 +109,10 @@ onMounted(async () => {
     if (settingsResponse.ok) {
         const payload = await settingsResponse.json()
         settings.value = payload
+    }
+
+    for (const section of settings.value.sections) {
+        sectionInfoDict.value[section.name] = section
     }
 
     const sectionNames = (await ls('.')).dirs
