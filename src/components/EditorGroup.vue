@@ -21,6 +21,13 @@ const props = defineProps<{
     names: string[]
 }>();
 
+function setBps(bps: number|null) {
+    // call setBps on all editors
+    editors.value.forEach((editor) => {
+        editor.setBps(bps)
+    })
+}
+
 const editors = ref<InstanceType<typeof PianorollEditor>[]>([]);
 
 const loadMidiFile = async (name: string, file: string) => {
@@ -45,7 +52,8 @@ const handleTransform = (transform: { scaleX: number, shiftX: number }, sourceIn
 
 // Expose the loadMidiFile method to parent components
 defineExpose({
-    loadMidiFile
+    loadMidiFile,
+    setBps
 });
 </script>
 

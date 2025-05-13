@@ -20,8 +20,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from "vue"
+import type { Ref } from "vue"
 import { labToRgbString, Note, Pianoroll } from "@/utils"
-import { now } from "tone"
 import { player } from "@/player"
 import type { INote } from "@/player"
 
@@ -33,24 +33,16 @@ interface DragBehavior {
     mouseUp(event: MouseEvent): void
 }
 
-const props = defineProps({
-    midiData: {
-        type: [ArrayBuffer, Uint8Array],
-        default: null,
-    },
-    editable: {
-        type: Boolean,
-        default: false,
-    },
-    minPitch: {
-        type: Number,
-        default: 0,
-    },
-    maxPitch: {
-        type: Number,
-        default: 127,
-    },
+const props = withDefaults(defineProps<{
+    editable?: boolean
+    minPitch?: number
+    maxPitch?: number
+}>(), {
+    editable: false,
+    minPitch: 0,
+    maxPitch: 127,
 })
+
 
 const emit = defineEmits([
     'edit',
@@ -65,7 +57,7 @@ let oldScaleX = 10
 let shiftX = 10
 let oldShiftX = 10
 let gap = 3
-let pianoroll = ref<Pianoroll>(new Pianoroll(props.midiData))
+let pianoroll = ref<Pianoroll>(new Pianoroll())
 let cursorPosition = 0
 let intervalId: ReturnType<typeof setInterval> | null = null
 let dragBehavior: DragBehavior | null = null
@@ -75,6 +67,7 @@ const editorDiv = ref<HTMLDivElement | null>(null)
 let isDragging = false
 const focused = ref(false)
 let midiMarkers: {beat: number, text: string}[] = []
+let originalBps = 120
 
 class MoveNoteDragBehavior implements DragBehavior {
     private _note: Note
@@ -184,8 +177,8 @@ const updatePlayerNotes = (): void => {
     for (const note of pianoroll.value.getNotes()) {
         notes.push({ pitch: note.pitch, startTime: note.onset / pianoroll.value.bps, endTime: (note.onset + note.duration) / pianoroll.value.bps, velocity: note.velocity })
     }
-    player.stop()
-    player.start({ notes: notes }, cursorPosition / pianoroll.value.bps + 0.1)
+    player.stop(true)
+    playbackId = player.start({ notes: notes }, cursorPosition / pianoroll.value.bps + 0.1)
 }
 
 const render = (notify: boolean = true): void => {
@@ -622,6 +615,7 @@ const loadMidiFile = async (fileName: string): Promise<void> => {
     }
     const arrayBuffer = await response.arrayBuffer()
     pianoroll.value = new Pianoroll(arrayBuffer)
+    originalBps = pianoroll.value.bps
     midiMarkers = []
     const midi = new Midi(arrayBuffer);
     for( const event of midi.header.meta) {
@@ -685,10 +679,20 @@ function transform(transform: { scaleX: number, shiftX: number }, notify: boolea
     render(notify)
 }
 
+function setBps(bps: number|null) {
+    if (bps !== null) {
+        pianoroll.value.bps = bps
+    } else {
+        pianoroll.value.bps = originalBps
+    }
+    updatePlayerNotes()
+}
+
 //expose loadMidiFile to parent
 defineExpose({
     loadMidiFile,
-    transform
+    transform,
+    setBps
 })
 </script>
 

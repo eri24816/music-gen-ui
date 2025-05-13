@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "preview": "vite preview",
-    "build": "vite build && node generate_list.js && cp -r resource dist/resource",
+    "build": "vite build && node generate_list.js $npm_config_resource_dir && cp -r $npm_config_resource_dir dist/resource",
+    "build:win": "vite build && node generate_list.js %npm_config_resource_dir% && cp -r %npm_config_resource_dir% dist/resource",
     "type-check": "vue-tsc --build"
   },
   "dependencies": {

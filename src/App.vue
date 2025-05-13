@@ -23,20 +23,23 @@
                 </TabSwitcher>
             </div>
         </div>
+        <SettingsPanel />
         <FooterComp />
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { marked } from 'marked'
 import PianorollEditor from './components/PianorollEditor.vue'
 import HeaderComp from './components/HeaderComp.vue'
 import TabSwitcher from './components/TabSwitcher.vue'
 import EditorGroup from './components/EditorGroup.vue'
 import FooterComp from './components/FooterComp.vue'
+import SettingsPanel from './components/SettingsPanel.vue'
+import { useBpmStore } from '@/stores/bpmStore'
 
-const editors = ref<InstanceType<typeof PianorollEditor|typeof EditorGroup>[]>([])
+const editors = ref<InstanceType<typeof PianorollEditor | typeof EditorGroup>[]>([])
 
 function isSection(section: Section | GroupedSection): section is Section {
     return !('groups' in section)
@@ -101,6 +104,16 @@ const sectionInfoDict = ref<Record<string, SectionSettings>>({})
 function renderMarkdown(text: string): string {
     return marked(text, { breaks: true })
 }
+
+const bpmStore = useBpmStore()
+
+
+watch(() => bpmStore.bps, (newBps) => {
+    for (const editor of editors.value) {
+        editor.setBps(newBps)
+    }
+})
+
 
 onMounted(async () => {
     listJson = await fetch('resource/list.json').then(res => res.json())

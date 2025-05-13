@@ -4,7 +4,7 @@ import { promises as fs } from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 
-const root = 'resource';
+const root = process.argv[2] || 'resource';
 const myList = {};
 
 // Helper function to get directories and files

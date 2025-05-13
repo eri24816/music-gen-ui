@@ -36,7 +36,6 @@ export class AutoKeyupPiano {
         if (this.pendingOffsets.has(pitch)) {
             this.piano.keyUp({ midi: pitch });
         }
-        console.log("playing note", pitch, velocity, duration)
         this.piano.keyDown({ midi: pitch, velocity: velocity/127 });
         this.pendingOffsets.set(pitch, this.now + duration);
     }
@@ -67,9 +66,14 @@ export class AutoKeyupPiano {
     /**
      * Stops all currently playing notes.
      */
-    stop() {
+    stop(allowSustain: boolean = false) {
         for (const [pitch, offset] of this.pendingOffsets.entries()) {
-            this.piano.keyUp({ midi: pitch });
+            if (allowSustain) {
+                this.piano.keyUp({ midi: pitch, time: Tone.now() + (offset - this.now) });
+            } else {
+                this.piano.keyUp({ midi: pitch });
+            }
+
             this.pendingOffsets.delete(pitch);
         }
     }
@@ -175,12 +179,12 @@ export class Player {
         return this.playbackId
     }
 
-    stop() {
+    stop(allowSustain: boolean = false) {
         this.playing = false;
         this.playbackId++;
         this.time = null;
         this.timeVersion++;
-        this.piano?.stop();
+        this.piano?.stop(allowSustain);
     }
 }
 
