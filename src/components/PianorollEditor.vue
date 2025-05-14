@@ -19,7 +19,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from "vue"
+import { ref, onMounted, onUnmounted, watch, computed } from "vue"
 import type { Ref } from "vue"
 import { labToRgbString, Note, Pianoroll } from "@/utils"
 import { player } from "@/player"
@@ -67,7 +67,9 @@ const editorDiv = ref<HTMLDivElement | null>(null)
 let isDragging = false
 const focused = ref(false)
 let midiMarkers: {beat: number, text: string}[] = []
-let originalBps = 120
+let overrideBps: number | null = null
+
+const bps = (() => overrideBps ?? pianoroll.value.bps)
 
 class MoveNoteDragBehavior implements DragBehavior {
     private _note: Note
@@ -175,10 +177,10 @@ const updatePlayerNotes = (): void => {
     }
     const notes: any[] = []
     for (const note of pianoroll.value.getNotes()) {
-        notes.push({ pitch: note.pitch, startTime: note.onset / pianoroll.value.bps, endTime: (note.onset + note.duration) / pianoroll.value.bps, velocity: note.velocity })
+        notes.push({ pitch: note.pitch, startTime: note.onset / bps(), endTime: (note.onset + note.duration) / bps(), velocity: note.velocity })
     }
     player.stop(true)
-    playbackId = player.start({ notes: notes }, cursorPosition / pianoroll.value.bps + 0.1)
+    playbackId = player.start({ notes: notes }, cursorPosition / bps() + 0.1)
 }
 
 const render = (notify: boolean = true): void => {
@@ -528,8 +530,8 @@ const _play = (): void => {
     for (const note of pianoroll.value.getNotes()) {
         notes.push({
             pitch: note.pitch,
-            startTime: (note.onset) / pianoroll.value.bps,
-            endTime: (note.onset + note.duration) / pianoroll.value.bps,
+            startTime: (note.onset) / bps(),
+            endTime: (note.onset + note.duration) / bps(),
             velocity: note.velocity,
         })
     }
@@ -541,13 +543,13 @@ const _play = (): void => {
         player.stop()
     }
     const noteOnCallback = (note: INote) => {
-        let updatedCursorPosition = note.startTime * pianoroll.value.bps
+        let updatedCursorPosition = note.startTime * bps()
         if (updatedCursorPosition !== cursorPosition) {
             cursorPosition = updatedCursorPosition
         }
     }
-    playbackId = player.start(sequence, cursorPosition / pianoroll.value.bps, noteOnCallback)
-    player.time = cursorPosition / pianoroll.value.bps
+    playbackId = player.start(sequence, cursorPosition / bps(), noteOnCallback)
+    player.time = cursorPosition / bps()
     console.log("playing", player.time, sequence)
     player.timeVersion++
     const startTime = Date.now()
@@ -560,7 +562,7 @@ const _play = (): void => {
         }
         const elapsedTime = Date.now() - startTime
         if (elapsedTime > 0) {
-            cursorPosition += 0.02 * pianoroll.value.bps
+            cursorPosition += 0.02 * bps()
             keepCursorInScreen()
         }
         render()
@@ -615,7 +617,6 @@ const loadMidiFile = async (fileName: string): Promise<void> => {
     }
     const arrayBuffer = await response.arrayBuffer()
     pianoroll.value = new Pianoroll(arrayBuffer)
-    originalBps = pianoroll.value.bps
     midiMarkers = []
     const midi = new Midi(arrayBuffer);
     for( const event of midi.header.meta) {
@@ -679,20 +680,22 @@ function transform(transform: { scaleX: number, shiftX: number }, notify: boolea
     render(notify)
 }
 
-function setBps(bps: number|null) {
-    if (bps !== null) {
-        pianoroll.value.bps = bps
-    } else {
-        pianoroll.value.bps = originalBps
-    }
+function setBps(newBps: number|null) {
+    overrideBps = newBps
     updatePlayerNotes()
+}
+
+// Add focus method
+function focus() {
+    editorDiv.value?.focus()
 }
 
 //expose loadMidiFile to parent
 defineExpose({
     loadMidiFile,
     transform,
-    setBps
+    setBps,
+    focus
 })
 </script>
 

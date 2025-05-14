@@ -8,6 +8,7 @@
                 :minPitch="21" 
                 :maxPitch="108"
                 @transform="(transform) => handleTransform(transform, index)"
+                @focus="() => emit('focus', name)"
             />
         </div>
     </div>
@@ -21,6 +22,10 @@ const props = defineProps<{
     names: string[]
 }>();
 
+const emit = defineEmits<{
+    (e: 'focus', name: string): void
+}>();
+
 function setBps(bps: number|null) {
     // call setBps on all editors
     editors.value.forEach((editor) => {
@@ -30,7 +35,9 @@ function setBps(bps: number|null) {
 
 const editors = ref<InstanceType<typeof PianorollEditor>[]>([]);
 
+
 const loadMidiFile = async (name: string, file: string) => {
+
     const editorIndex = props.names.indexOf(name);
 
     try {
@@ -50,10 +57,16 @@ const handleTransform = (transform: { scaleX: number, shiftX: number }, sourceIn
     });
 };
 
+// Add focus method
+function focus() {
+    editors.value[0]?.focus()
+}
+
 // Expose the loadMidiFile method to parent components
 defineExpose({
     loadMidiFile,
-    setBps
+    setBps,
+    focus
 });
 </script>
 

@@ -15,6 +15,7 @@
                 :key="file"
                 :class="['file-btn', { active: selectedFile === file }]"
                 @click="selectFile(file)"
+                :id="file"
             >
                 {{ file }}
             </button>
@@ -30,14 +31,16 @@ import { ref, computed, onMounted } from 'vue';
 
 const props = defineProps<{
     files: string[]
+    selectedFile: string
 }>();
 
 const emit = defineEmits<{
     (e: 'select', file: string): void
+    (e: 'click', file: string): void
 }>();
 
 const sortAscending = ref(true);
-const selectedFile = ref(props.files[0]);
+const selectedFile = ref(props.selectedFile);
 
 const sortedFiles = computed(() => {
     const sorted = [...props.files].sort();
@@ -51,13 +54,28 @@ const toggleSortDirection = () => {
 const selectFile = (file: string) => {
     selectedFile.value = file;
     emit('select', file);
+    emit('click', file);
+    
 };
 
-onMounted(() => {
-    // select the first file
+const selectFirstFile = () => { 
     if (props.files.length > 0) {
         selectFile(props.files[0]);
     }
+}
+
+onMounted(() => {
+    emit('select', props.selectedFile);
+    // scroll to the selected file
+    const fileElement = document.getElementById(props.selectedFile);
+    if (fileElement) {
+        fileElement.scrollIntoView({ behavior: 'smooth' });
+    }
+})
+
+defineExpose({
+    selectFile,
+    selectFirstFile
 })
 </script>
 

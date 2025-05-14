@@ -2,23 +2,35 @@
     <div class="app">
         <HeaderComp :title="settings.title" :description="settings.description" />
         <div class="section" v-for="section in sections" :key="section.sectionName">
-            <h2 v-html="renderMarkdown(section.sectionName)"></h2>
+            <h2 v-html="renderMarkdown(section.sectionName)" :id="section.sectionName"></h2>
             <p 
                 class="section-description" 
                 v-if="sectionInfoDict[section.sectionName]"
                 v-html="renderMarkdown(sectionInfoDict[section.sectionName].description)"
             ></p>
             <div class="section-content" v-if="isSection(section)">
-                <TabSwitcher :files="section.items" @select="(file) => handleFileSelect(file, section.sectionName)">
-                    <PianorollEditor ref="editors" class="editor" :minPitch="21" :maxPitch="108" :editable="false"></PianorollEditor>
+                <TabSwitcher :files="section.items" @select="(file) => handleFileSelect(file, section.sectionName)" 
+                    @click="(itemName) => handleFileSwitcherClick(section.sectionName, itemName)"
+                    :selectedFile="selectedItems[section.sectionName]" :ref="(el)=>dictRefCallback(el, tabSwitchers, section.sectionName)">
+                    <PianorollEditor 
+                        :ref="(el)=>dictRefCallback(el, editors, section.sectionName)"
+                        class="editor" 
+                        :minPitch="21" 
+                        :maxPitch="108" 
+                        :editable="false"
+                        @focus="() => handleEditorFocus(section)"
+                    ></PianorollEditor>
                 </TabSwitcher>
             </div>
             <div class="section-content" v-else>
-                <TabSwitcher :files="section.groups" @select="(file) => handleGroupFileSelect(file, section)">
+                <TabSwitcher :files="section.items" @select="(file) => handleGroupFileSelect(file, section)" 
+                    @click="(itemName) => handleFileSwitcherClick(section.sectionName, itemName)"
+                    :selectedFile="selectedItems[section.sectionName]" :ref="(el)=>dictRefCallback(el, tabSwitchers, section.sectionName)">
                     <EditorGroup 
-                        ref="editors"
+                        :ref="(el)=>dictRefCallback(el, editors, section.sectionName)"
                         class="editor-group"
                         :names="section.groupMembers"
+                        @focus="() => handleEditorFocus(section)"
                     />
                 </TabSwitcher>
             </div>
@@ -39,39 +51,69 @@ import FooterComp from './components/FooterComp.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import { useBpmStore } from '@/stores/bpmStore'
 
-const editors = ref<InstanceType<typeof PianorollEditor | typeof EditorGroup>[]>([])
+const tabSwitchers = ref<Record<string, any>>({})
+const editors = ref<Record<string, InstanceType<typeof PianorollEditor> | InstanceType<typeof EditorGroup>>>({})
+const selectedItems = ref<Record<string, string>>({})
+let allowFragmentUpdate = false
+
+const dictRefCallback = <T>(el: T | null, dict: Record<string, any>, key: string) => {
+    console.log('dictRefCallback', el, dict, key)
+    if (el) {
+        dict[key] = el
+    } else {
+        delete dict[key]
+    }
+}
 
 function isSection(section: Section | GroupedSection): section is Section {
-    return !('groups' in section)
+    return !('groupMembers' in section);
 }
 
 type Section = { sectionName: string, items: string[] }
-type GroupedSection = { sectionName: string, groups: string[], groupMembers: string[] }
+type GroupedSection = { sectionName: string, items: string[], groupMembers: string[] }
 const sections = ref<(Section | GroupedSection)[]>([])
 
-function handleFileSelect(file: string, dir: string, groupName?: string) {
-    const selectedSectionId = sections.value.findIndex(section => section.sectionName === dir)
-    console.log(selectedSectionId)
-    let path: string
+// Add function to update URL fragment
+function updateUrlFragment(section: string, item: string, groupName?: string) {
+    console.log('updateUrlFragment', section, item, groupName)
+    if (!allowFragmentUpdate) return
+    const params = new URLSearchParams()
+    params.set('section', section)
+    params.set('item', item)
     if (groupName) {
-        path = `resource/${dir}/${groupName}/${file}`
-    } else {
-        path = `resource/${dir}/${file}`
+        params.set('group', groupName)
     }
-    (editors.value[selectedSectionId] as InstanceType<typeof PianorollEditor>).loadMidiFile(path)
+    window.location.hash = params.toString()
 }
 
-async function handleGroupFileSelect(file: string, section: GroupedSection) {
+function handleFileSelect(itemName: string, sectionName: string, groupName?: string) {
+    console.log('handleFileSelect', itemName, sectionName, groupName)
+    let path: string
+    if (groupName) {
+        path = `resource/${sectionName}/${groupName}/${itemName}`
+    } else {
+        path = `resource/${sectionName}/${itemName}`
+    }
+    (editors.value[sectionName] as InstanceType<typeof PianorollEditor>).loadMidiFile(path)
+    selectedItems.value[sectionName] = itemName
+}
+
+function handleFileSwitcherClick(sectionName: string, itemName: string, groupName?: string) {
+    updateUrlFragment(sectionName, itemName, groupName) // Add URL fragment update
+}
+
+async function handleGroupFileSelect(itemName: string, section: GroupedSection) {
     const groupIndex = sections.value.indexOf(section)
     if (groupIndex === -1) return
     
-    const editorGroup = editors.value[groupIndex]
+    const editorGroup = editors.value[section.sectionName]
     if (!editorGroup) return
 
     for (const memberName of section.groupMembers) {
-        const path = `resource/${section.sectionName}/${memberName}/${file}`
+        const path = `resource/${section.sectionName}/${memberName}/${itemName}`
         await editorGroup.loadMidiFile(memberName, path)
     }
+    selectedItems.value[section.sectionName] = itemName
 }
 
 let listJson: Record<string, { dirs: string[], files: string[] }> | null = null
@@ -109,7 +151,7 @@ const bpmStore = useBpmStore()
 
 
 watch(() => bpmStore.bps, (newBps) => {
-    for (const editor of editors.value) {
+    for (const editor of Object.values(editors.value)) {
         editor.setBps(newBps)
     }
 })
@@ -143,22 +185,89 @@ onMounted(async () => {
 
     const sortedSections = sectionNames.sort((a, b) => sectionToOrderMap.get(a)! - sectionToOrderMap.get(b)!)
     
+    const urlParams = new URLSearchParams(window.location.hash.slice(1))
+    const sectionNameFromUrl = urlParams.get('section')
+    const itemNameFromUrl = urlParams.get('item')
+
     for (const sectionName of sortedSections) {
         const lsResult = await ls(`${sectionName}`)
+        
         if (lsResult.dirs.length > 0) {
             const memberNames = lsResult.dirs
-            const allGroups = new Set<string>()
+            const allItems = new Set<string>()
             for (const memberName of memberNames) {
                 for (const item of (await ls(`${sectionName}/${memberName}`)).files) {
-                    allGroups.add(itemNameTrim(item))
+                    allItems.add(itemNameTrim(item))
                 }
             }
-            sections.value.push({ sectionName, groups: Array.from(allGroups), groupMembers: memberNames })
+            if (sectionNameFromUrl && itemNameFromUrl && sectionNameFromUrl == sectionName) {
+                selectedItems.value[sectionName] = itemNameFromUrl
+            } else {
+                selectedItems.value[sectionName] = Array.from(allItems)[0]
+            }
+            sections.value.push({ sectionName, items: Array.from(allItems), groupMembers: memberNames })
         } else {
+            if (sectionNameFromUrl && itemNameFromUrl && sectionNameFromUrl == sectionName) {
+                selectedItems.value[sectionName] = itemNameFromUrl
+            } else {
+                selectedItems.value[sectionName] = lsResult.files[0]
+            }
             sections.value.push({ sectionName, items: lsResult.files })
         }
     }
+
+    
+    if (sectionNameFromUrl && itemNameFromUrl) {
+        //scroll to the section
+        nextTick(() => {
+            const sectionElement = document.getElementById(sectionNameFromUrl)
+            if (sectionElement) {
+                sectionElement.scrollIntoView({ behavior: 'smooth' })
+            }
+            // focus on the editor
+            const editor = editors.value[sectionNameFromUrl]
+            if (editor) {
+                editor.focus()
+            }
+            allowFragmentUpdate = true
+            window.addEventListener("hashchange", () => {
+                console.log('hashchange', window.location.hash)
+                const urlParams = new URLSearchParams(window.location.hash.slice(1))
+                const sectionNameFromUrl = urlParams.get('section')
+                const itemNameFromUrl = urlParams.get('item')
+                if (!sectionNameFromUrl || !itemNameFromUrl) return
+                // scroll to the section if not in view
+                const sectionElement = document.getElementById(sectionNameFromUrl)
+                if (sectionElement && !sectionElement.getBoundingClientRect().top) {
+                    sectionElement.scrollIntoView({ behavior: 'smooth' })
+                }
+                // select the item in the tab switcher
+                const tabSwitcher = tabSwitchers.value[sectionNameFromUrl]
+                if (tabSwitcher) {
+                    tabSwitcher.selectFile(itemNameFromUrl)
+                }
+            })
+        })
+    } else {
+        allowFragmentUpdate = true
+    }
 });
+
+function nextTick(fn: () => void) {
+    setTimeout(fn, 0)
+}
+
+// Add focus handlers
+function handleEditorFocus(section: Section | GroupedSection) {
+    if (!section) return
+    
+    const editor = editors.value[section.sectionName]
+    if (!editor) return
+    const currentFile = selectedItems.value[section.sectionName]
+    if (currentFile) {
+        updateUrlFragment(section.sectionName, currentFile)
+    }
+}
 
 </script>
 
