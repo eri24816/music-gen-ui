@@ -1,6 +1,7 @@
-import { ref, type Ref } from 'vue';
+import { ref, watch, type Ref } from 'vue';
 import { Piano } from '@tonejs/piano';
 import * as Tone from 'tone';
+import { useStore } from './stores/bpmStore'
 
 export interface INote {
     pitch: number
@@ -88,6 +89,7 @@ export class Player {
     private notes: INote[] = []
     private playing: boolean = false
     private startOffset: number = 0
+    private gain: Tone.Gain
 
     constructor() {
         const tonePiano = new Piano({
@@ -100,15 +102,19 @@ export class Player {
             }
         })
 
-        const gain = new Tone.Gain(0.3).toDestination();
+        this.gain = new Tone.Gain(0.3).toDestination();
         tonePiano.disconnect();
-        tonePiano.chain(gain);
+        tonePiano.chain(this.gain);
 
         tonePiano.load().then(() => {
             console.log("Piano loaded");
             this.isReady.value = true;
         });
         this.piano = new AutoKeyupPiano(tonePiano);
+    }
+
+    setVolume(volume: number) {
+        this.gain.gain.value = volume;
     }
     
     isPlaying() {

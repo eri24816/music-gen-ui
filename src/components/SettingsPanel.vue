@@ -4,15 +4,20 @@
             <label>BPM</label>
             <NullableSlider :min="40" :max="240" v-model="bpm" />
         </div>
+        <div class="setting-item">
+            <label>Volume</label>
+            <SliderComp v-model="store.volume" :min="0" :max="1" :step="0.01" />
+        </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useBpmStore } from '@/stores/bpmStore'
+import { computed, ref } from 'vue'
+import { useStore } from '@/stores/bpmStore'
 import NullableSlider from './NullableSlider.vue'
+import SliderComp from './SliderComp.vue'
 
-const store = useBpmStore()
+const store = useStore()
 const bpm = computed({
     get: () => store.bps ? Math.round(store.bps * 60.0) : null,
     set: (val) => store.bps = val ? val / 60.0 : null
@@ -30,6 +35,9 @@ const bpm = computed({
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
     z-index: 1000;
     width: 300px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 .setting-item {

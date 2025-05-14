@@ -49,7 +49,8 @@ import TabSwitcher from './components/TabSwitcher.vue'
 import EditorGroup from './components/EditorGroup.vue'
 import FooterComp from './components/FooterComp.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
-import { useBpmStore } from '@/stores/bpmStore'
+import { useStore } from '@/stores/bpmStore'
+import { player } from './player'
 
 const tabSwitchers = ref<Record<string, any>>({})
 const editors = ref<Record<string, InstanceType<typeof PianorollEditor> | InstanceType<typeof EditorGroup>>>({})
@@ -147,10 +148,10 @@ function renderMarkdown(text: string): string {
     return marked(text, { breaks: true })
 }
 
-const bpmStore = useBpmStore()
+const store = useStore()
 
 
-watch(() => bpmStore.bps, (newBps) => {
+watch(() => store.bps, (newBps) => {
     for (const editor of Object.values(editors.value)) {
         editor.setBps(newBps)
     }
@@ -268,6 +269,10 @@ function handleEditorFocus(section: Section | GroupedSection) {
         updateUrlFragment(section.sectionName, currentFile)
     }
 }
+
+watch(() => store.volume, (newVolume) => {
+    player.setVolume(newVolume)
+})
 
 </script>
 
