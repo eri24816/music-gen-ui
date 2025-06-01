@@ -2,7 +2,12 @@
     <div class="main">
         <div class="center-container">
             <div class="editor-container">
-                <PianorollEditor ref="editor" :editable="true" class="editor" />
+                <PianorollEditor ref="editor" :editable="true" class="editor" @transform="handleEditorTransform" :min-pitch="21" :max-pitch="108"/>
+                <div class="shift-with-editor-container">
+                    <div class="shift-with-editor" ref="shiftWithEditor" >
+                        <SectionControl :sections="sections" :scaleX="scaleX" />
+                    </div>
+                </div>
             </div>
             <SettingsPanel />
         </div>
@@ -14,17 +19,35 @@
 import { ref, onMounted, watch } from 'vue'
 import { marked } from 'marked'
 import PianorollEditor from './components/PianorollEditor.vue'
-import FooterComp from './components/FooterComp.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import { useStore } from '@/stores/bpmStore'
 import { player } from './player'
 import LeftBar from './components/LeftBar.vue'
+import SectionControl from './components/SectionControl.vue'
 
 const editor = ref<InstanceType<typeof PianorollEditor>>()
+const shiftWithEditor = ref<HTMLDivElement>()
 
-// Add markdown rendering function
+const scaleX = ref(1)
+const shiftX = ref(0)
+
+const sections = ref<{ start: number, end: number, label: string }[]>([])
+
+sections.value.push({ start: 0, end: 4, label: "Section 1" })
+sections.value.push({ start: 4, end: 8, label: "Section 2" })
+sections.value.push({ start: 8, end: 16, label: "Section 3" })
+
+function handleEditorTransform(transform: { scaleX: number, shiftX: number }) {
+    console.log(transform)
+    shiftWithEditor.value!.style.transform = `translate(${transform.shiftX*transform.scaleX}px, 0px)`
+    console.log(shiftWithEditor.value!.style.transform)
+    scaleX.value = transform.scaleX
+    shiftX.value = transform.shiftX
+}
+
+// Fix the marked function type issue
 function renderMarkdown(text: string): string {
-    return marked(text, { breaks: true })
+    return marked.parse(text, { breaks: true })
 }
 
 const store = useStore()
@@ -65,24 +88,17 @@ watch(() => store.volume, (newVolume) => {
 
 .editor {
     height: 570px;
+    border-radius: 6px 6px 0 0;
+    overflow: hidden;
+}
+
+.editor-container {
+    overflow: hidden;
+    position: relative;
 }
 
 h2 {
     padding: 20px 80px;
-}
-
-.section-content {
-    padding: 0 60px;
-}
-
-.section-description {
-    padding: 0px 140px 20px 140px;
-    margin: -10px 0 20px 0;
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 14px;
-}
-.section{
-    margin: 100px 0;
 }
 
 .footer {
@@ -96,4 +112,18 @@ h2 {
     padding: 40px 66px;
     gap: 20px;
 }
+
+.shift-with-editor {
+    
+    position: absolute;
+    height: 20px;
+    width: 10000px;
+}
+
+.shift-with-editor-container {
+    position: relative;
+    overflow: hidden;
+    height: 20px;
+}
+
 </style>

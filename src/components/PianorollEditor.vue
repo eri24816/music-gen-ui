@@ -1,6 +1,5 @@
 <template>
-    <div class="pianoroll-editor" tabindex="0" @keydown.space.prevent="playOrStop" @focus="focused = true; render()"
-        @blur="focused = false; render()" @wheel="handleWheel" ref="editorDiv">
+    <div class="pianoroll-editor"  @keydown.space.prevent="playOrStop" @wheel="handleWheel" ref="editorDiv">
         <canvas class="pianoroll-canvas" ref="pianorollCanvas" @dragover="handleDragOver" @mousedown="handleMouseDown"
             @contextmenu.prevent></canvas>
         <div class="controls">
@@ -65,7 +64,6 @@ const isPlaying = ref(false)
 const numPitches = props.maxPitch - props.minPitch + 1
 const editorDiv = ref<HTMLDivElement | null>(null)
 let isDragging = false
-const focused = ref(false)
 let midiMarkers: {beat: number, text: string}[] = []
 let overrideBps: number | null = null
 
@@ -246,8 +244,8 @@ const render = (notify: boolean = true): void => {
         [80, 2],
         [40, 1],
     ]
-    for (const [bar, hop_] of hops) {
-        if (endDrawnBar - startDrawnBar > bar) {
+    for (const [ratio, hop_] of hops) {
+        if (width/scaleX > ratio) {
             hop = hop_
             startDrawnBar = Math.floor(startDrawnBar / hop) * hop
             endDrawnBar = Math.floor(endDrawnBar / hop) * hop
@@ -325,7 +323,7 @@ const render = (notify: boolean = true): void => {
 
     // Draw cursor
     const cursorWidth = 10
-    ctx.strokeStyle = focused.value ? "#55FF00" : "#FFFFFF88"
+    ctx.strokeStyle = "#55FF00"
     for (let i = 0; i < (isPlaying.value ? cursorWidth : 1); i++) {
         ctx.beginPath()
         ctx.globalAlpha = Math.exp(-i / (cursorWidth / 3))
@@ -450,10 +448,6 @@ const screenToPitch = (screenY: number): number => {
 }
 
 const handleWheel = (event: WheelEvent): void => {
-    if (!focused.value && !event.ctrlKey) {
-        return
-    }
-
     event.preventDefault()
 
     if (event.ctrlKey) {
@@ -624,7 +618,6 @@ const loadMidiFile = async (fileName: string): Promise<void> => {
             midiMarkers.push({beat: event.ticks / midi.header.ppq, text: event.text})
         }
     }
-    console.log(midiMarkers)
     
     render()
 
@@ -647,8 +640,6 @@ const inBounds = (x: number, y: number): boolean => {
 
 const handlePlayClick = () => {
     playOrStop()
-    // Refocus the editor after clicking the button
-    editorDiv.value?.focus()
 }
 
 onMounted(() => {
@@ -657,9 +648,6 @@ onMounted(() => {
     }
     render()
     emit("transform", { scaleX, shiftX })
-
-    // Focus the editor when mounted
-    editorDiv.value?.focus()
 
 
     document.addEventListener("mousemove", handleMouseMove)
@@ -685,17 +673,11 @@ function setBps(newBps: number|null) {
     updatePlayerNotes()
 }
 
-// Add focus method
-function focus() {
-    editorDiv.value?.focus()
-}
-
 //expose loadMidiFile to parent
 defineExpose({
     loadMidiFile,
     transform,
-    setBps,
-    focus
+    setBps
 })
 </script>
 
@@ -703,29 +685,12 @@ defineExpose({
 .pianoroll-editor {
     position: relative;
     min-height: 100px;
-    outline: none;
-    /* Removes the default focus outline */
 }
 
-/* Make the focus indicator more visible */
-.pianoroll-editor:focus {
-    box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.8);
-}
-
-.pianoroll-editor:focus:hover {
-
-    box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.8);
-}
-
-/* Add a subtle hover effect to indicate it's interactive */
-.pianoroll-editor:hover {
-    box-shadow: 0 0 0 1px rgba(66, 153, 225, 0.8);
-}
 
 .pianoroll-canvas {
     position: absolute;
     border: 1px solid black;
-    border-radius: 10px;
     background-color: #000000;
     top: 0;
     left: 0;
