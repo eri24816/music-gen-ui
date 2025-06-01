@@ -11,11 +11,25 @@ body {
 }
 
 button {
-    background: linear-gradient(to bottom, #000000, #262626);
+    background: #2B2B2B;
     color: #fff;
     border: none;
     padding: 8px 16px;
     border-radius: 4px;
+}
+
+button:hover {
+    background: #3B3B3B;
+}
+
+button:active {
+    background: #222222;
+}
+
+#app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
 }
 
 /* dark scrollbar */

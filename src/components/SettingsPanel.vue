@@ -2,7 +2,7 @@
     <div class="settings-panel">
         <div class="setting-item">
             <label>BPM</label>
-            <NullableSlider :min="40" :max="240" v-model="bpm" />
+            <SliderComp :min="40" :max="240" v-model="bpm" />
         </div>
         <div class="setting-item">
             <label>Volume</label>
@@ -19,16 +19,13 @@ import SliderComp from './SliderComp.vue'
 
 const store = useStore()
 const bpm = computed({
-    get: () => store.bps ? Math.round(store.bps * 60.0) : null,
-    set: (val) => store.bps = val ? val / 60.0 : null
+    get: () => Math.round(store.bps * 60.0),
+    set: (val) => store.bps = val / 60.0
 })
 </script>
 
 <style scoped>
 .settings-panel {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
     background: #2a2a2a;
     padding: 15px 20px;
     border-radius: 8px;

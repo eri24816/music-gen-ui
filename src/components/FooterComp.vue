@@ -1,7 +1,7 @@
 <template>
     <footer class="footer">
         <p>
-            Created by <a href="https://github.com/eri24816" target="_blank">eri24816</a> while waiting his music generation AI to be trained.
+            Made by <a href="https://github.com/eri24816" target="_blank">eri24816</a>
         </p>
     </footer>
 </template>
@@ -9,8 +9,6 @@
 <style scoped>
 .footer {
     text-align: center;
-    padding: 20px;
-    margin-top: 40px;
     color: rgba(255, 255, 255, 0.7);
 }
 
