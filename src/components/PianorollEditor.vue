@@ -181,6 +181,172 @@ const updatePlayerNotes = (): void => {
     playbackId = player.start({ notes: notes }, cursorPosition / bps() + 0.1)
 }
 
+
+interface Style{
+    drawBackground(ctx: CanvasRenderingContext2D, width: number, height: number, highlightedYs: number[], highlightedHeight:number): void
+    drawNote(ctx: CanvasRenderingContext2D, note: Note, x: number, y: number, width: number, height: number): void
+    drawBarLine(ctx: CanvasRenderingContext2D, frame: number, x: number, height: number): void
+}
+
+class ChromaticStyle implements Style{
+    public drawBackground(ctx: CanvasRenderingContext2D, width: number, height: number, highlightedYs: number[], highlightedHeight:number) {
+        ctx.fillStyle = "black"
+        ctx.fillRect(0, 0, width, height)
+        // for (const y of highlightedYs) {
+        //     ctx.fillStyle = "#404040"
+        //     ctx.fillRect(0, y - highlightedHeight/2, width, highlightedHeight)
+        // }
+    }
+    public drawNote(ctx: CanvasRenderingContext2D, note: Note, x: number, y: number, width: number, height: number) {
+        // sustain
+        const hue = (note.pitch % 12) * 30.0 / 180 * Math.PI // 30 degrees per semitone
+        let lightness = Math.pow(note.velocity / 127, 2) * 128
+        // lightness += Math.abs(hue - 120) * 0.4 * (90 - lightness) / 100
+        
+        ctx.beginPath()
+        ctx.roundRect(
+            x,
+            y - height/2,
+            width,
+            height,
+            1,
+        )
+        const centering = Math.max(0.2, 1.1 - note.velocity/127)
+        ctx.globalAlpha = 0.2
+        ctx.fillStyle = labToRgbString(lightness, Math.cos(hue)*128*centering, Math.sin(hue)*128*centering)
+        ctx.fill()
+        
+        
+        
+        ctx.beginPath()
+        // onset (square)
+        let onsetHeight = height * Math.exp(note.velocity / 127 * 1.6-0.4)
+        ctx.rect(
+            x - height/2,
+            y - onsetHeight/2,
+            height,
+            onsetHeight,
+        )
+        ctx.globalAlpha = 1
+        ctx.fillStyle = labToRgbString(lightness, Math.cos(hue)*128, Math.sin(hue)*128)
+        ctx.fill()
+        
+    }
+    public drawBarLine(ctx: CanvasRenderingContext2D, frame: number, x: number, height: number): void {
+        if (frame % 4 == 0) {
+            ctx.strokeStyle = "#444444"
+        } else if (frame % 1 == 0) {
+            ctx.strokeStyle = "#252525"
+        } else {
+            ctx.strokeStyle = "#151515"
+        }
+        ctx.beginPath()
+        ctx.moveTo(x, 0)
+        ctx.lineTo(x, height)
+        ctx.stroke()
+        ctx.fillStyle = "#aaaaaa"
+        if (frame % 4 == 0) {
+            ctx.fillText(
+                (frame / 4 + 1).toString(),
+                x + 5,
+                15,
+            )
+        }
+    }
+}
+
+class FruityStyle implements Style{
+    public drawBarLine(ctx: CanvasRenderingContext2D, frame: number, x: number, height: number): void {
+        if (frame % 4 == 0) {
+            ctx.strokeStyle = "#000000a0"
+        } else if (frame % 1 == 0) {
+            ctx.strokeStyle = "#00000040"
+        } else {
+            ctx.strokeStyle = "#00000020"
+        }
+        ctx.beginPath()
+        ctx.moveTo(x, 0)
+        ctx.lineTo(x, height)
+        ctx.stroke()
+        ctx.fillStyle = "#aaaaaa"
+        if (frame % 4 == 0) {
+            ctx.fillText(
+                (frame / 4 + 1).toString(),
+                x + 5,
+                15,
+            )
+        }
+    }
+    public drawBackground(ctx: CanvasRenderingContext2D, width: number, height: number) {
+        ctx.fillStyle = "#2E3E48"
+        ctx.fillRect(0, 0, width, height)
+    }
+    public drawNote(ctx: CanvasRenderingContext2D, note: Note, x: number, y: number, width: number, height: number) {
+        // sustain
+
+        let lightness = Math.pow(note.velocity / 127, 2) * 50 +40 
+        const gap = 1
+        ctx.beginPath()
+        ctx.roundRect(
+            x + gap,
+            y,
+            width - 2*gap,
+            height,
+            1,
+        )
+        ctx.fillStyle = `hsl(90, 20%, ${lightness}%)`
+        ctx.fill()
+    }
+}
+
+
+class FruityDarkStyle implements Style{
+    public drawBarLine(ctx: CanvasRenderingContext2D, frame: number, x: number, height: number): void {
+        if (frame % 4 == 0) {
+            ctx.strokeStyle = "#ffffff40"
+        } else if (frame % 1 == 0) {
+            ctx.strokeStyle = "#ffffff20"
+        } else {
+            ctx.strokeStyle = "#ffffff10"
+        }
+        ctx.beginPath()
+        ctx.moveTo(x, 0)
+        ctx.lineTo(x, height)
+        ctx.stroke()
+        ctx.fillStyle = "#888888"
+        if (frame % 4 == 0) {
+            ctx.fillText(
+                (frame / 4 + 1).toString(),
+                x + 7,
+                16,
+            )
+        }
+    }
+    public drawBackground(ctx: CanvasRenderingContext2D, width: number, height: number) {
+        ctx.fillStyle = "#050505"
+        ctx.fillRect(0, 0, width, height)
+    }
+    public drawNote(ctx: CanvasRenderingContext2D, note: Note, x: number, y: number, width: number, height: number) {
+        // sustain
+
+        let lightness = Math.pow(note.velocity / 127, 2) * 50 +40 
+        const gap = 1
+        ctx.beginPath()
+        ctx.roundRect(
+            x + gap,
+            y,
+            width - 2*gap,
+            height,
+            1,
+        )
+        ctx.fillStyle = `hsl(90, 25%, ${lightness}%)`
+        ctx.fill()
+    }
+}
+
+
+
+let style = new ChromaticStyle()
 const render = (notify: boolean = true): void => {
     if (!pianoroll || !ctx || !pianorollCanvas.value) return
 
@@ -196,8 +362,15 @@ const render = (notify: boolean = true): void => {
     let width = pianorollCanvas.value.clientWidth
     pianorollCanvas.value.height = height
     pianorollCanvas.value.width = width
-    // Clear canvas
-    ctx.clearRect(0, 0, width, height)
+
+
+    const highlightedYs: number[] = []
+    for (let i = 0; i < 11; i++) {
+        for (let j of [0, 2, 4, 5, 7, 9, 11]) {
+            highlightedYs.push(pitchToCanvas(i*12 + j))
+        }
+    }
+    style.drawBackground(ctx, width, height, highlightedYs, height/numPitches)
 
     
     // Draw markers
@@ -254,71 +427,21 @@ const render = (notify: boolean = true): void => {
     }
     startDrawnBar = Math.max(startDrawnBar, 0)
     for (let i = startDrawnBar; i <= endDrawnBar; i += hop) {
-        if (i % 4 == 0) {
-            ctx.strokeStyle = "#444444"
-        } else if (i % 1 == 0) {
-            ctx.strokeStyle = "#252525"
-        } else {
-            ctx.strokeStyle = "#151515"
-        }
-        ctx.beginPath()
-        ctx.moveTo(beatToCanvas(i), 0)
-        ctx.lineTo(beatToCanvas(i), height)
-        ctx.stroke()
-        ctx.fillStyle = "#aaaaaa"
-        if (i % 4 == 0) {
-            ctx.fillText(
-                (i / 4 + 1).toString(),
-                beatToCanvas(i) + 5,
-                15,
-            )
-        }
+        style.drawBarLine(ctx, i, beatToCanvas(i), height)
     }
 
+
     // Draw MIDI notes
-    let noteCount = 0
     const timeLowerBound = Math.max(0, -shiftX)
     const timeUpperBound = width / scaleX - shiftX
     for (const note of pianoroll.value.getNotesBetween(
         timeLowerBound,
         timeUpperBound,
     )) {
-        // sustain
-        const hue = (note.pitch % 12) * 30.0 / 180 * Math.PI // 30 degrees per semitone
-        let lightness = Math.pow(note.velocity / 127, 2) * 128
-        // lightness += Math.abs(hue - 120) * 0.4 * (90 - lightness) / 100
-
-        const saturation = 100
-        ctx.beginPath()
-        ctx.roundRect(
-            (note.onset + shiftX) * scaleX + gap,
-            pitchToCanvas(note.pitch),
-            note.duration * scaleX - 2 * gap,
-            height / numPitches,
-            1,
-        )
-        const centering = Math.max(0.2, 1.1 - note.velocity/127)
-        ctx.globalAlpha = 0.2
-        ctx.fillStyle = labToRgbString(lightness, Math.cos(hue)*128*centering, Math.sin(hue)*128*centering)
-        ctx.fill()
-        
-
-
-        ctx.beginPath()
-        // onset (square)
-        let noteHeight = height / numPitches * Math.exp(note.velocity / 127 * 1.6-0.4)
-        ctx.rect(
-            (note.onset + shiftX) * scaleX,
-            pitchToCanvas(note.pitch) + height/ numPitches/2 - noteHeight/2,
-            height / numPitches,
-            noteHeight,
-        )
-        ctx.globalAlpha = 1
-        ctx.fillStyle = labToRgbString(lightness, Math.cos(hue)*128, Math.sin(hue)*128)
-        ctx.fill()
-
-
-        noteCount++
+        style.drawNote(ctx, note, (note.onset + shiftX) * scaleX,
+        pitchToCanvas(note.pitch),
+        note.duration * scaleX,
+        height / numPitches)
     }
 
     // Draw cursor
@@ -646,10 +769,11 @@ onMounted(() => {
     if (pianorollCanvas.value) {
         ctx = pianorollCanvas.value.getContext("2d")
     }
-    render()
+    scaleX = pianorollCanvas.value!.clientWidth / 20
+    shiftX = pianorollCanvas.value!.clientWidth / 1200
     emit("transform", { scaleX, shiftX })
 
-
+    render()
     document.addEventListener("mousemove", handleMouseMove)
     document.addEventListener("mouseup", handleMouseUp)
 })

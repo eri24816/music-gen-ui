@@ -25,6 +25,7 @@ const props = defineProps<{
 }>()
 
 const colorPresets = [
+    "#576DA4","#86612E","#4C7A3C",
     "hsl(120, 40%, 30%)",
     "hsl(240, 50%, 40%)",
     "hsl(280, 20%, 40%)",

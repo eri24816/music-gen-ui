@@ -90,6 +90,7 @@ watch(() => store.volume, (newVolume) => {
     height: 570px;
     border-radius: 6px 6px 0 0;
     overflow: hidden;
+    border: 2px solid #414141;
 }
 
 .editor-container {
