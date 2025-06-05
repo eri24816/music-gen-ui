@@ -55,8 +55,7 @@ let scaleX = 10
 let oldScaleX = 10
 let shiftX = 10
 let oldShiftX = 10
-let gap = 3
-let pianoroll = ref<Pianoroll>(new Pianoroll())
+let pianoroll = new Pianoroll()
 let cursorPosition = 0
 let intervalId: ReturnType<typeof setInterval> | null = null
 let dragBehavior: DragBehavior | null = null
@@ -66,78 +65,129 @@ const editorDiv = ref<HTMLDivElement | null>(null)
 let isDragging = false
 let midiMarkers: {beat: number, text: string}[] = []
 let overrideBps: number | null = null
+let selection: { x: number, y: number, width: number, height: number } | null = null
+let selectedNotes: Note[] = []
 
-const bps = (() => overrideBps ?? pianoroll.value.bps)
+const setSelection = (selection_:{x: number, y: number, width: number, height: number} | null) => {
+    selection = selection_
+    render()
+}
+const getSelection = () => {
+    if (selection == null) {
+        return null
+    }
+    return {x:selection.x, y:selection.y, width:selection.width, height:selection.height}
+}
+
+const bps = (() => overrideBps ?? pianoroll.bps)
 
 class MoveNoteDragBehavior implements DragBehavior {
-    private _note: Note
+    private _notes: Note[]
+    private _startDraggingPitch: number
+    private _startDraggingBeat: number
+    private _originalNotes: Note[]
     public get note(): Note {
-        return this._note
+        return this._notes[0] || null
     }
     constructor(event: MouseEvent) {
-        const noteUnderPointer = pianoroll.value.getNoteAt(
+        console.log(selectedNotes)
+        const noteUnderPointer = pianoroll.getNoteAt(
             screenToBeat(event.clientX),
             screenToPitch(event.clientY),
         )
         if (noteUnderPointer) {
-            this._note = noteUnderPointer
+            if(selectedNotes.includes(noteUnderPointer)) {
+                this._notes = selectedNotes.slice()
+            } else {
+                this._notes = [noteUnderPointer]
+            }
         } else {
-            this._note = createNote(
+            this._notes = [createNote(
                 screenToBeat(event.clientX),
                 screenToPitch(event.clientY),
-            )
-            pianoroll.value.addNote(this._note)
-            emit("edit", [this._note], [])
+            )]
+            pianoroll.addNote(this._notes[0])
+            selectedNotes = []
+            emit("edit", [this._notes[0]], [])
             updatePlayerNotes()
         }
-        player.playNoteDown({ pitch: this._note.pitch, velocity: this._note.velocity, endTime: 0, startTime: 0 })
+        this._originalNotes = [...this._notes]
+        this._startDraggingBeat = screenToBeat(event.clientX)
+        this._startDraggingPitch = screenToPitch(event.clientY)
+        player.playNoteDown({ pitch: this._notes[0].pitch, velocity: this._notes[0].velocity, endTime: 0, startTime: 0 })
     }
     mouseDown(event: MouseEvent) {
         render()
     }
     public mouseMove(event: MouseEvent): void {
-        pianoroll.value.removeNote(this._note)
-        const newNote = createNote(
-            screenToBeat(event.clientX),
-            screenToPitch(event.clientY),
-            this._note.velocity,
-        )
-        pianoroll.value.addNote(newNote)
-
-        if (newNote.pitch !== this._note.pitch) {
-            player.playNoteUp({ pitch: this._note.pitch, endTime: 1, startTime: 0, velocity: 0 })
-            player.playNoteDown({ pitch: newNote.pitch, velocity: newNote.velocity, endTime: 0, startTime: 0 })
+        for (const note of this._notes) {
+            pianoroll.removeNote(note)
         }
-        emit("edit", [newNote], [this._note])
+        let pitchDelta = screenToPitch(event.clientY) - this._startDraggingPitch
+        let beatDelta = screenToBeat(event.clientX) - this._startDraggingBeat
+        // limit pitchDelta so that (min(originalPitch)+pitchDelta) > props.minPitch
+        // and (max(originalPitch)+pitchDelta) < props.maxPitch
+        const pitchDeltaMin = props.minPitch - Math.min(...this._originalNotes.map(note => note.pitch))
+        const pitchDeltaMax = props.maxPitch - Math.max(...this._originalNotes.map(note => note.pitch))
+        pitchDelta = Math.min(pitchDeltaMax, pitchDelta)
+        pitchDelta = Math.max(pitchDeltaMin, pitchDelta)
+        // limit beatDelta so that (min(originalBeat)+beatDelta) > 0    
+        const beatDeltaMin = -Math.min(...this._originalNotes.map(note => note.onset))
+        beatDelta = Math.max(beatDeltaMin, beatDelta)
+        const newNotes: Note[] = []
+        for (const [i, note] of this._notes.entries()) {
+            const newNote = createNote(
+                this._originalNotes[i].onset + beatDelta,
+                this._originalNotes[i].pitch+pitchDelta,
+                note.velocity,
+            )
+            newNotes.push(newNote)
+            pianoroll.addNote(newNote)
+        }
+        if (this._notes.length == 1 && this._notes[0].pitch != newNotes[0].pitch) {
+            player.playNoteUp({ pitch: this._notes[0].pitch, endTime: 1, startTime: 0, velocity: 0 })
+            player.playNoteDown({ pitch: newNotes[0].pitch, velocity: newNotes[0].velocity, endTime: 0, startTime: 0 })
+        }
+        if (selectedNotes.length) {
+            selectedNotes = newNotes
+        }
         updatePlayerNotes()
-        this._note = newNote
+        this._notes = newNotes
         render()
     }
     public mouseUp(event: MouseEvent): void {
-        player.playNoteUp({ pitch: this._note.pitch, endTime: 1, startTime: 0, velocity: 0 })
+        player.playNoteUp({ pitch: this._notes[0].pitch, endTime: 1, startTime: 0, velocity: 0 })
     }
 }
 
 class RemoveNoteDragBehavior implements DragBehavior {
     mouseDown(event: MouseEvent) {
-        const noteUnderPointer = pianoroll.value.getNoteAt(
+        const noteUnderPointer = pianoroll.getNoteAt(
             screenToBeat(event.clientX),
             screenToPitch(event.clientY),
         )
         if (noteUnderPointer) {
-            pianoroll.value.removeNote(noteUnderPointer)
-            render()
-            emit("edit", [], [noteUnderPointer])
+            if (selectedNotes.includes(noteUnderPointer)) {
+                for (const note of selectedNotes) {
+                    pianoroll.removeNote(note)
+                }
+                emit("edit", [], selectedNotes)
+            } else {
+                pianoroll.removeNote(noteUnderPointer)
+                emit("edit", [], [noteUnderPointer])
+            }
             updatePlayerNotes()
         }
+        selectedNotes = []
+        render()
     }
     public mouseMove(event: MouseEvent): void {
-        const noteUnderPointer = pianoroll.value.getNoteAt(
+        const noteUnderPointer = pianoroll.getNoteAt(
             screenToBeat(event.clientX),
             screenToPitch(event.clientY),
         )
         if (noteUnderPointer) {
-            pianoroll.value.removeNote(noteUnderPointer)
+            pianoroll.removeNote(noteUnderPointer)
             render()
             emit("edit", [], [noteUnderPointer])
             updatePlayerNotes()
@@ -169,12 +219,39 @@ class CursorDragBehavior implements DragBehavior {
     }
 }
 
+class SelectionDragBehavior implements DragBehavior {
+    private _x: number = 0
+    private _y: number = 0
+    private _width: number = 0
+    private _height: number = 0
+    public mouseDown(event: MouseEvent): void {
+        this._x = screenToBeat(event.clientX)
+        this._y = screenToPitch(event.clientY)
+        this._width = 0
+        this._height = 0
+    }
+    public mouseMove(event: MouseEvent): void {
+        this._width = screenToBeat(event.clientX) - this._x
+        this._height = screenToPitch(event.clientY) - this._y
+        setSelection({x:this._x, y:this._y, width:this._width, height:this._height})
+        selectedNotes = []
+        for (const note of pianoroll.getNotesBetween(Math.min(this._x, this._x + this._width), Math.max(this._x, this._x + this._width))) {
+            if (note.pitch >= Math.min(this._y, this._y + this._height) && note.pitch <= Math.max(this._y, this._y + this._height)) {
+                selectedNotes.push(note)
+            }
+        }
+    }
+    public mouseUp(event: MouseEvent): void {
+        setSelection(null)
+    }
+}
+
 const updatePlayerNotes = (): void => {
     if (!isPlaying.value) {
         return
     }
     const notes: any[] = []
-    for (const note of pianoroll.value.getNotes()) {
+    for (const note of pianoroll.getNotes()) {
         notes.push({ pitch: note.pitch, startTime: note.onset / bps(), endTime: (note.onset + note.duration) / bps(), velocity: note.velocity })
     }
     player.stop(true)
@@ -184,8 +261,9 @@ const updatePlayerNotes = (): void => {
 
 interface Style{
     drawBackground(ctx: CanvasRenderingContext2D, width: number, height: number, highlightedYs: number[], highlightedHeight:number): void
-    drawNote(ctx: CanvasRenderingContext2D, note: Note, x: number, y: number, width: number, height: number): void
+    drawNote(ctx: CanvasRenderingContext2D, note: Note, x: number, y: number, width: number, height: number, selected): void
     drawBarLine(ctx: CanvasRenderingContext2D, frame: number, x: number, height: number): void
+    drawSelection(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number): void
 }
 
 class ChromaticStyle implements Style{
@@ -197,33 +275,34 @@ class ChromaticStyle implements Style{
         //     ctx.fillRect(0, y - highlightedHeight/2, width, highlightedHeight)
         // }
     }
-    public drawNote(ctx: CanvasRenderingContext2D, note: Note, x: number, y: number, width: number, height: number) {
+    public drawNote(ctx: CanvasRenderingContext2D, note: Note, x: number, y: number, width: number, height: number, selected: boolean) {
         // sustain
         const hue = (note.pitch % 12) * 30.0 / 180 * Math.PI // 30 degrees per semitone
         let lightness = Math.pow(note.velocity / 127, 2) * 128
         // lightness += Math.abs(hue - 120) * 0.4 * (90 - lightness) / 100
-        
+
+        if (selected) {
+            lightness += 30
+        }
         ctx.beginPath()
         ctx.roundRect(
             x,
-            y - height/2,
+            y,
             width,
             height,
             1,
         )
         const centering = Math.max(0.2, 1.1 - note.velocity/127)
-        ctx.globalAlpha = 0.2
-        ctx.fillStyle = labToRgbString(lightness, Math.cos(hue)*128*centering, Math.sin(hue)*128*centering)
+        ctx.globalAlpha = selected? 0.5:0.2
+        ctx.fillStyle = selected? "white":labToRgbString(lightness, Math.cos(hue)*128*centering, Math.sin(hue)*128*centering)
         ctx.fill()
-        
-        
-        
+
         ctx.beginPath()
         // onset (square)
         let onsetHeight = height * Math.exp(note.velocity / 127 * 1.6-0.4)
         ctx.rect(
             x - height/2,
-            y - onsetHeight/2,
+            y + height/2 - onsetHeight/2,
             height,
             onsetHeight,
         )
@@ -253,9 +332,21 @@ class ChromaticStyle implements Style{
             )
         }
     }
+    public drawSelection(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number): void {
+        ctx.fillStyle = "#4AA9450f"
+        ctx.strokeStyle = "#45A96B"
+        ctx.beginPath()
+       
+        ctx.roundRect(x,y,width,height,2)
+        ctx.fill()
+        ctx.stroke()
+    }
 }
 
 class FruityStyle implements Style{
+    drawSelection(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number): void {
+        throw new Error("Method not implemented.")
+    }
     public drawBarLine(ctx: CanvasRenderingContext2D, frame: number, x: number, height: number): void {
         if (frame % 4 == 0) {
             ctx.strokeStyle = "#000000a0"
@@ -301,6 +392,9 @@ class FruityStyle implements Style{
 
 
 class FruityDarkStyle implements Style{
+    drawSelection(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number): void {
+        throw new Error("Method not implemented.")
+    }
     public drawBarLine(ctx: CanvasRenderingContext2D, frame: number, x: number, height: number): void {
         if (frame % 4 == 0) {
             ctx.strokeStyle = "#ffffff40"
@@ -372,34 +466,6 @@ const render = (notify: boolean = true): void => {
     }
     style.drawBackground(ctx, width, height, highlightedYs, height/numPitches)
 
-    
-    // Draw markers
-    const markerColors = ["hsl(90, 60%, 20%)", "hsl(180, 60%, 20%)", "hsl(270, 60%, 20%)", "hsl(45, 60%, 20%)","hsl(0, 60%, 20%)",  "hsl(135, 60%, 20%)", "hsl(225, 60%, 20%)", "hsl(315, 60%, 20%)"]
-    // map marker text to color index
-    const markerColorMap = new Map<string, number>()
-    for (let i = 0; i < midiMarkers.length; i++) {
-        const text = midiMarkers[i].text[0]
-        if (!markerColorMap.has(text)) {
-            markerColorMap.set(text, markerColorMap.size % markerColors.length)
-        }
-    }
-    const markerHeight = 10
-    for (let i = 0; i < midiMarkers.length; i++) {
-        const start = midiMarkers[i].beat
-        const end = i==midiMarkers.length-1 ? pianoroll.value.duration : midiMarkers[i+1].beat
-        ctx.beginPath()
-        ctx.fillStyle = markerColors[markerColorMap.get(midiMarkers[i].text[0]) ?? 0]
-        ctx.rect(beatToCanvas(start), height - markerHeight, beatToCanvas(end) - beatToCanvas(start), markerHeight)
-        ctx.fill()
-        ctx.fillStyle = "#FFFFFF"   
-        ctx.font = "12px Arial"
-        ctx.textAlign = "left"
-        ctx.fillText(
-            midiMarkers[i].text,
-            beatToCanvas(start),
-            height - markerHeight/2,
-        )
-    }
     // Draw bar lines
     ctx.strokeStyle = "#333333"
     ctx.fillStyle = "white"
@@ -430,18 +496,25 @@ const render = (notify: boolean = true): void => {
         style.drawBarLine(ctx, i, beatToCanvas(i), height)
     }
 
+    
+    if (selection) {
+        style.drawSelection(ctx, beatToCanvas(selection.x), pitchToCanvas(selection.y), beatToCanvas(selection.x + selection.width) - beatToCanvas(selection.x), pitchToCanvas(selection.y + selection.height) - pitchToCanvas(selection.y))
+    }
+    
 
     // Draw MIDI notes
     const timeLowerBound = Math.max(0, -shiftX)
     const timeUpperBound = width / scaleX - shiftX
-    for (const note of pianoroll.value.getNotesBetween(
+    for (const note of pianoroll.getNotesBetween(
         timeLowerBound,
         timeUpperBound,
     )) {
         style.drawNote(ctx, note, (note.onset + shiftX) * scaleX,
         pitchToCanvas(note.pitch),
         note.duration * scaleX,
-        height / numPitches)
+        height / numPitches,
+        selectedNotes.includes(note),
+        )
     }
 
     // Draw cursor
@@ -482,7 +555,7 @@ const createNote = (
     if (onset < 0) {
         onset = 0
     }
-    const notesInBar = pianoroll.value.getNotesOnsetBetween(
+    const notesInBar = pianoroll.getNotesOnsetBetween(
         onset,
         onset - (onset % 4) + 4,
     )
@@ -599,7 +672,9 @@ const handleMouseDown = (event: MouseEvent): void => {
     // test if mouse on cursor
     const cursorX = getCursorCanvasPosition()
     const pointerX = screenToCanvas(event.clientX)
-    if (event.buttons === 1) {
+    if (event.ctrlKey) {
+        dragBehavior = new SelectionDragBehavior()
+    } else if (event.buttons === 1) {
         if (Math.abs(cursorX - pointerX) < 10 || !props.editable) {
             dragBehavior = new CursorDragBehavior()
         } else if (props.editable) {
@@ -644,7 +719,7 @@ const _play = (): void => {
 
     isPlaying.value = true
     const notes: any[] = []
-    for (const note of pianoroll.value.getNotes()) {
+    for (const note of pianoroll.getNotes()) {
         notes.push({
             pitch: note.pitch,
             startTime: (note.onset) / bps(),
@@ -712,7 +787,7 @@ const keepCursorInScreen = (): void => {
 }
 
 const saveMidi = (): void => {
-    const outputBuffer = pianoroll.value.toMidi().toArray()
+    const outputBuffer = pianoroll.toMidi().toArray()
     const blob = new Blob([outputBuffer], { type: "audio/midi" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
@@ -733,7 +808,7 @@ const loadMidiFile = async (fileName: string): Promise<void> => {
         throw new Error(`Failed to fetch MIDI file: ${response.statusText}`)
     }
     const arrayBuffer = await response.arrayBuffer()
-    pianoroll.value = new Pianoroll(arrayBuffer)
+    pianoroll = new Pianoroll(arrayBuffer)
     midiMarkers = []
     const midi = new Midi(arrayBuffer);
     for( const event of midi.header.meta) {
@@ -747,7 +822,7 @@ const loadMidiFile = async (fileName: string): Promise<void> => {
 }
 
 const clear = (): void => {
-    pianoroll.value = new Pianoroll()
+    pianoroll = new Pianoroll()
     render()
 }
 
@@ -782,10 +857,6 @@ onUnmounted(() => {
     stop()
 })
 
-watch(pianoroll, (newVal) => {
-    render()
-})
-
 function transform(transform: { scaleX: number, shiftX: number }, notify: boolean = true) {
     scaleX = transform.scaleX
     shiftX = transform.shiftX
@@ -801,7 +872,9 @@ function setBps(newBps: number|null) {
 defineExpose({
     loadMidiFile,
     transform,
-    setBps
+    setBps,
+    getSelection,
+    setSelection
 })
 </script>
 

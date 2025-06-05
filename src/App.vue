@@ -9,7 +9,7 @@
                     </div>
                 </div>
             </div>
-            <SettingsPanel />
+            <SettingsPanel class="settings-panel" />
         </div>
         <LeftBar />
     </div>
@@ -127,4 +127,8 @@ h2 {
     height: 20px;
 }
 
+.settings-panel {
+    margin-top: auto;
+    margin-bottom: auto;
+}
 </style>
