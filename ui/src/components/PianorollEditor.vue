@@ -179,6 +179,7 @@ class RemoveNoteDragBehavior implements DragBehavior {
             updatePlayerNotes()
         }
         selectedNotes = []
+        setSelection(null)
         render()
     }
     public mouseMove(event: MouseEvent): void {
@@ -233,16 +234,28 @@ class SelectionDragBehavior implements DragBehavior {
     public mouseMove(event: MouseEvent): void {
         this._width = screenToBeat(event.clientX) - this._x
         this._height = screenToPitch(event.clientY) - this._y
-        setSelection({x:this._x, y:this._y, width:this._width, height:this._height})
+        setSelection({ x: this._x, y: this._y, width: this._width, height: this._height })
         selectedNotes = []
-        for (const note of pianoroll.getNotesBetween(Math.min(this._x, this._x + this._width), Math.max(this._x, this._x + this._width))) {
-            if (note.pitch >= Math.min(this._y, this._y + this._height) && note.pitch <= Math.max(this._y, this._y + this._height)) {
-                selectedNotes.push(note)
+        if (Math.abs(this._height) > 5 || Math.abs(this._width) < 3) {
+            for (const note of pianoroll.getNotesBetween(Math.min(this._x, this._x + this._width), Math.max(this._x, this._x + this._width))) {
+                if (note.pitch >= Math.min(this._y, this._y + this._height) && note.pitch <= Math.max(this._y, this._y + this._height)) {
+                    selectedNotes.push(note)
+                }
             }
         }
+        else {
+
+            // select bars that touch the selection
+            let startBar = Math.floor(Math.min(this._x, this._x + this._width) / 4) * 4
+            let endBar = Math.ceil(Math.max(this._x, this._x + this._width) / 4) * 4
+            setSelection({x:startBar, y:props.minPitch-1, width:endBar-startBar, height:props.maxPitch-props.minPitch+1})
+        }
+
     }
     public mouseUp(event: MouseEvent): void {
-        setSelection(null)
+        if (Math.abs(this._height) > 5 || Math.abs(this._width) < 3) {
+            setSelection(null)
+        }
     }
 }
 

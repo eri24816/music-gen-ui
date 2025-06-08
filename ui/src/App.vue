@@ -47,7 +47,7 @@ function handleEditorTransform(transform: { scaleX: number, shiftX: number }) {
 
 // Fix the marked function type issue
 function renderMarkdown(text: string): string {
-    return marked.parse(text, { breaks: true })
+    return marked.parse(text, { breaks: true }) as string
 }
 
 const store = useStore()
