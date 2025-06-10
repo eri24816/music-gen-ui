@@ -2,12 +2,20 @@
     <div class="main">
         <div class="center-container">
             <div class="editor-container">
-                <PianorollEditor ref="editor" :editable="true" class="editor" @transform="handleEditorTransform" :min-pitch="21" :max-pitch="108"/>
+                <PianorollEditor ref="editor" :editable="true" class="editor" @transform="handleEditorTransform" @select-area="handleSelectArea" @unselect="handleUnselect" :min-pitch="21" :max-pitch="108"/>
                 <div class="shift-with-editor-container">
                     <div class="shift-with-editor" ref="shiftWithEditor" >
                         <SectionControl :sections="sections" :scaleX="scaleX" />
                     </div>
                 </div>
+                <ToolBox 
+                    v-if="toolboxVisible"
+                    :x="toolboxPosition.x"
+                    :y="toolboxPosition.y"
+                    :tools="tools"
+                    @tool-selected="handleToolSelected"
+                    class="toolbox"
+                />
             </div>
             <SettingsPanel class="settings-panel" />
         </div>
@@ -24,6 +32,8 @@ import { useStore } from '@/stores/bpmStore'
 import { player } from './player'
 import LeftBar from './components/LeftBar.vue'
 import SectionControl from './components/SectionControl.vue'
+import ToolBox from './components/ToolBox.vue'
+import { generate } from './api'
 
 const editor = ref<InstanceType<typeof PianorollEditor>>()
 const shiftWithEditor = ref<HTMLDivElement>()
@@ -61,6 +71,58 @@ watch(() => store.bps, (newBps) => {
 watch(() => store.volume, (newVolume) => {
     player.setVolume(newVolume)
 })
+
+const toolboxVisible = ref(false)
+const toolboxPosition = ref({ x: 0, y: 0 })
+const tools = ref([
+    { name: 'generate', label: 'Generate' }
+])
+
+function handleSelectArea(area: { x: number, y: number, width: number, height: number }) {
+    const editorRect = editor.value?.$el.getBoundingClientRect()
+    if (!editorRect) return
+
+    // Convert beat position to screen coordinates
+    const x = (area.x + area.width) * scaleX.value + shiftX.value * scaleX.value
+    
+    // Convert pitch to screen coordinates (piano roll uses inverted Y axis)
+    const heightPerPitch = editorRect.height / (108 - 21 + 1)
+    const y = editorRect.height - ((area.y) * heightPerPitch)
+
+    toolboxPosition.value = { x, y }
+    toolboxVisible.value = true
+}
+
+function handleUnselect() {
+    toolboxVisible.value = false
+}
+
+function handleToolSelected(toolName: string) {
+    const selection = editor.value?.getSelection()
+    if (!selection) return
+    
+    // Handle tool actions
+    if (toolName === 'generate') {
+        // Emit or handle generate action
+        console.log('Generate requested for area:', selection)
+        generate(editor.value!.getMidi(), {
+            range_to_generate: { 
+                start_beat: selection.x, 
+                end_beat: selection.x + selection.width
+            },
+            segments: sections.value.map(s => ({
+                start_bar: s.start,
+                end_bar: s.end,
+                label: s.label
+            })),
+            song_duration: 80*32
+        }).then(midi => {
+            editor.value!.loadMidiFile(midi)
+        })
+
+    }
+    
+}
 
 </script>
 
@@ -130,5 +192,11 @@ h2 {
 .settings-panel {
     margin-top: auto;
     margin-bottom: auto;
+}
+
+.toolbox {
+    position: absolute;
+    top: 0;
+    left: 0;
 }
 </style>

@@ -1,15 +1,23 @@
-from fastapi import FastAPI, UploadFile, File, Body
+import io
+from fastapi import FastAPI, Form, Response, UploadFile
 from fastapi.responses import FileResponse
 import miditoolkit.midi.parser
 from pydantic import BaseModel
 import uvicorn
 
 class RangeToGenerate(BaseModel):
-    start: int
-    end: int
+    start_beat: int
+    end_beat: int
+
+class SegmentInfo(BaseModel):
+    start_bar: int
+    end_bar: int
+    label: str
 
 class GenerateParams(BaseModel):
     range_to_generate: RangeToGenerate
+    segments: list[SegmentInfo]
+    song_duration: int
 
 class MusicGenServer:
     def __init__(self, frontend_dir: str='ui/dist'):
@@ -36,9 +44,13 @@ class MusicGenServer:
         """Regular file serving"""
         return FileResponse(path=f'{self._frontend_dir}/{path}')
     
-    def _generate(self, midi_file: UploadFile = File(...), params: GenerateParams = Body(...)):
+    def _generate(self, midi_file: UploadFile, params: str= Form()):
+        params_obj = GenerateParams.model_validate_json(params)
         midi = miditoolkit.midi.parser.MidiFile(file=midi_file.file)
-        return self.generate(midi, params)
+        result_midi = self.generate(midi, params_obj)
+        file = io.BytesIO()
+        result_midi.dump(file=file)
+        return Response(content=file.getvalue(), media_type="audio/midi")
 
     # abstract methods
     def generate(self, midi: miditoolkit.midi.parser.MidiFile, params: GenerateParams) -> miditoolkit.midi.parser.MidiFile:

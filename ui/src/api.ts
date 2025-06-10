@@ -1,7 +1,20 @@
 import axios from 'axios';
 
+type RangeToGenerate = {
+  start_beat: number;
+  end_beat: number;
+};
+
+type SegmentInfo = {
+  start_bar: number;
+  end_bar: number;
+  label: string;
+};
+
 type GenerateParams = {
-  rangeToGenerate: {start: number, end: number};
+  range_to_generate: RangeToGenerate;
+  segments: SegmentInfo[];
+  song_duration: number;
 }
 
 /**
@@ -10,7 +23,6 @@ type GenerateParams = {
  * @returns Promise containing the generated MIDI file as a Blob
  */
 export async function generate(midiFile: File, params: GenerateParams): Promise<Blob> {
-
   const formData = new FormData();
   formData.append('midi_file', midiFile);
   formData.append('params', JSON.stringify(params));

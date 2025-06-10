@@ -46,7 +46,10 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits([
     'edit',
     'transform',
-    'save'
+    'save',
+    'select-area',
+    'select-notes',
+    'unselect'
 ])
 
 const pianorollCanvas = ref<HTMLCanvasElement | null>(null)
@@ -179,6 +182,7 @@ class RemoveNoteDragBehavior implements DragBehavior {
             updatePlayerNotes()
         }
         selectedNotes = []
+        emit("unselect")
         setSelection(null)
         render()
     }
@@ -255,6 +259,11 @@ class SelectionDragBehavior implements DragBehavior {
     public mouseUp(event: MouseEvent): void {
         if (Math.abs(this._height) > 5 || Math.abs(this._width) < 3) {
             setSelection(null)
+            if (selectedNotes.length > 0) {
+                emit("select-notes", selectedNotes)
+            }
+        } else {
+            emit("select-area", getSelection())
         }
     }
 }
@@ -274,7 +283,7 @@ const updatePlayerNotes = (): void => {
 
 interface Style{
     drawBackground(ctx: CanvasRenderingContext2D, width: number, height: number, highlightedYs: number[], highlightedHeight:number): void
-    drawNote(ctx: CanvasRenderingContext2D, note: Note, x: number, y: number, width: number, height: number, selected): void
+    drawNote(ctx: CanvasRenderingContext2D, note: Note, x: number, y: number, width: number, height: number, selected: boolean): void
     drawBarLine(ctx: CanvasRenderingContext2D, frame: number, x: number, height: number): void
     drawSelection(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number): void
 }
@@ -799,28 +808,18 @@ const keepCursorInScreen = (): void => {
     shiftX += (targetCursorX - getCursorCanvasPosition()) / scaleX
 }
 
-const saveMidi = (): void => {
+const getMidi = (): File => {
     const outputBuffer = pianoroll.toMidi().toArray()
     const blob = new Blob([outputBuffer], { type: "audio/midi" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = "edited_midi.mid"
-    a.click()
-    URL.revokeObjectURL(url)
-    emit("save")
+    return new File([blob], "generated.mid", { type: "audio/midi", lastModified: Date.now() })
 }
 
-const loadMidiFile = async (fileName: string): Promise<void> => {
+
+const loadMidiFile = async (midiFile: Blob): Promise<void> => {
     stop()
     cursorPosition = 0
     shiftX = 10
-    const response = await fetch(fileName)
-    if (!response.ok) {
-        clear()
-        throw new Error(`Failed to fetch MIDI file: ${response.statusText}`)
-    }
-    const arrayBuffer = await response.arrayBuffer()
+    const arrayBuffer = await midiFile.arrayBuffer()
     pianoroll = new Pianoroll(arrayBuffer)
     midiMarkers = []
     const midi = new Midi(arrayBuffer);
@@ -887,7 +886,8 @@ defineExpose({
     transform,
     setBps,
     getSelection,
-    setSelection
+    setSelection,
+    getMidi
 })
 </script>
 

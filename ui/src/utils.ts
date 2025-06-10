@@ -95,10 +95,10 @@ export class Pianoroll {
         for (const note of this.notes) {
             // Do not use time/duration in the addNote function. It incorrectly calculates the ticks.
             midi.tracks[0].addNote({
-                ticks: (note.onset / this.bps) * ticksPerSecond,
-                durationTicks: (note.duration / this.bps) * ticksPerSecond,
+                ticks: Math.round((note.onset / this.bps) * ticksPerSecond),
+                durationTicks: Math.round((note.duration / this.bps) * ticksPerSecond),
                 midi: note.pitch,
-                velocity: note.velocity,
+                velocity: note.velocity / 127,
             });
         }
         return midi;
