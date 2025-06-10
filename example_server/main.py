@@ -33,7 +33,7 @@ class SegmentFullSongMusicGenServer(MusicGenServer):
 
         midi = generated_segment.to_midi()
         return midi
- 
+
 server = SegmentFullSongMusicGenServer()
 app = server.get_app()
 

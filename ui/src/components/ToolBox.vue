@@ -38,23 +38,23 @@ const position = computed(() => ({
 
 <style scoped>
 .toolbox {
+    position: absolute;
     display: flex;
     gap: 4px;
     padding: 4px;
-    background: #1a1a1a;
-    border: 1px solid #333;
+    background: #00000055;
     border-radius: 4px;
     z-index: 1000;
 }
 
 .tool-button {
-    padding: 4px 8px;
-    background: #45A96B;
+    padding: 4px 16px;
+    background: #216b2c;
     color: white;
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 16px;
     transition: background 0.2s;
 }
 

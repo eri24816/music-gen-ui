@@ -1,11 +1,12 @@
 <template>
-    <div class="main">
+    <div class="main" tabindex="0" @keydown="handleKeyDown">
         <div class="center-container">
             <div class="editor-container">
-                <PianorollEditor ref="editor" :editable="true" class="editor" @transform="handleEditorTransform" @select-area="handleSelectArea" @unselect="handleUnselect" :min-pitch="21" :max-pitch="108"/>
+                <PianorollEditor ref="editor" :editable="true" class="editor" @transform="handleEditorTransform" @select-range="handleEditorSelectRange" @unselect-range="handleUnselectRange" :min-pitch="21" :max-pitch="108"/>
                 <div class="shift-with-editor-container">
                     <div class="shift-with-editor" ref="shiftWithEditor" >
-                        <SectionControl :sections="sections" :scaleX="scaleX" />
+                        <RangeSelect :scaleX="scaleX" class="range-select" ref="rangeSelect" @select="handleSelectRange"/>
+                        <SectionControl :sections="sections" :scaleX="scaleX" class="section-control"/>
                     </div>
                 </div>
                 <ToolBox 
@@ -34,9 +35,13 @@ import LeftBar from './components/LeftBar.vue'
 import SectionControl from './components/SectionControl.vue'
 import ToolBox from './components/ToolBox.vue'
 import { generate } from './api'
+import RangeSelect from './components/RangeSelect.vue'
 
 const editor = ref<InstanceType<typeof PianorollEditor>>()
 const shiftWithEditor = ref<HTMLDivElement>()
+const rangeSelect = ref<InstanceType<typeof RangeSelect>>()
+
+const selectedRange = ref<{ start: number, end: number } | null>(null)
 
 const scaleX = ref(1)
 const shiftX = ref(0)
@@ -78,27 +83,37 @@ const tools = ref([
     { name: 'generate', label: 'Generate' }
 ])
 
-function handleSelectArea(area: { x: number, y: number, width: number, height: number }) {
-    const editorRect = editor.value?.$el.getBoundingClientRect()
-    if (!editorRect) return
-
-    // Convert beat position to screen coordinates
-    const x = (area.x + area.width) * scaleX.value + shiftX.value * scaleX.value
-    
-    // Convert pitch to screen coordinates (piano roll uses inverted Y axis)
-    const heightPerPitch = editorRect.height / (108 - 21 + 1)
-    const y = editorRect.height - ((area.y) * heightPerPitch)
-
-    toolboxPosition.value = { x, y }
-    toolboxVisible.value = true
+function handleEditorSelectRange(start: number, end: number) {
+    rangeSelect.value!.setRange({ start: start, end: end })
+    selectedRange.value = { start: start, end: end }
 }
 
-function handleUnselect() {
+function handleSelectRange(range: { start: number, end: number }) {
+    editor.value?.selectRange(range)
+    selectedRange.value = range
+}
+
+watch([selectedRange, shiftX, scaleX], () => {
+    if (selectedRange.value) {
+        ShowToolbox()
+    } else {
+        toolboxVisible.value = false
+    }
+})
+
+function ShowToolbox() {
+    toolboxVisible.value = true
+    toolboxPosition.value = { x: selectedRange.value!.end * scaleX.value + shiftX.value * scaleX.value + 10, y: editor.value?.$el.getBoundingClientRect().height - 40 }
+    rangeSelect.value!.setRange(selectedRange.value!)
+}
+
+function handleUnselectRange(range: { start: number, end: number }) {
     toolboxVisible.value = false
+    rangeSelect.value!.unselect()
 }
 
 function handleToolSelected(toolName: string) {
-    const selection = editor.value?.getSelection()
+    const selection = editor.value?.getSelectionBox()
     if (!selection) return
     
     // Handle tool actions
@@ -124,6 +139,14 @@ function handleToolSelected(toolName: string) {
     
 }
 
+function handleKeyDown(event: KeyboardEvent) {
+    console.log(event.code)
+    if (event.code === 'Space') {
+        event.preventDefault(); // Prevent page scroll
+        editor.value?.playOrStop()
+    }
+}
+
 </script>
 
 <style scoped>
@@ -132,6 +155,7 @@ function handleToolSelected(toolName: string) {
     flex-direction: row;
     background-color: #1D1D1D;
     flex: 1;
+    outline: none; /* Remove focus outline if desired */
 }
 
 .left-bar {
@@ -179,14 +203,14 @@ h2 {
 .shift-with-editor {
     
     position: absolute;
-    height: 20px;
+    height: 40px;
     width: 10000px;
 }
 
 .shift-with-editor-container {
     position: relative;
     overflow: hidden;
-    height: 20px;
+    height: 40px;
 }
 
 .settings-panel {
@@ -199,4 +223,15 @@ h2 {
     top: 0;
     left: 0;
 }
+
+.range-select {
+    height: 15px;
+}
+
+.section-control {
+    width: 100%;
+    height: 20px;
+    background-color: #000000;
+}
+
 </style>

@@ -148,7 +148,7 @@ export class Player {
 
         let currentNoteIdx = 0
         for (; currentNoteIdx < this.notes.length; currentNoteIdx++) {
-            if (this.notes[currentNoteIdx].startTime >= startTime) {
+            if (this.notes[currentNoteIdx].startTime >= startTime - 0.01) {
                 break;
             }
         }
@@ -173,10 +173,10 @@ export class Player {
                 }
             }
 
-            if (currentTime > duration) {
-                this.stop();
-                return;
-            }
+            // if (currentTime > duration) {
+            //     this.stop();
+            //     return;
+            // }
 
             setTimeout(tick, 15);
         };

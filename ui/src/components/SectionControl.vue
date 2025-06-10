@@ -133,11 +133,8 @@ function stopDrag() {
 
 <style scoped>
 .section-container {
-    width: 100%;
-    height: 20px;
-    background-color: #000000;
+    position:relative;
 }
-
 .section {
     position: absolute;
     top: 0;
