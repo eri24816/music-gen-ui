@@ -56,9 +56,7 @@ for (const section of defaultSectionString.split(" ")) {
 }
 
 function handleEditorTransform(transform: { scaleX: number, shiftX: number }) {
-    console.log(transform)
     shiftWithEditor.value!.style.transform = `translate(${transform.shiftX*transform.scaleX}px, 0px)`
-    console.log(shiftWithEditor.value!.style.transform)
     scaleX.value = transform.scaleX
     shiftX.value = transform.shiftX
 }
@@ -148,7 +146,6 @@ function handleToolSelected(toolName: string) {
 }
 
 function handleKeyDown(event: KeyboardEvent) {
-    console.log(event.code)
     if (event.code === 'Space') {
         event.preventDefault(); // Prevent page scroll
         editor.value?.playOrStop()

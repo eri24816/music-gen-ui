@@ -2,6 +2,7 @@
     <div class="pianoroll-editor"  @keydown.space.prevent="playOrStop" @wheel="handleWheel" ref="editorDiv">
         <canvas class="pianoroll-canvas" ref="pianorollCanvas" @dragover="handleDragOver" @mousedown="handleMouseDown"
             @contextmenu.prevent></canvas>
+        <!--
         <div class="controls">
             <button class="control-btn" @click.prevent="handlePlayClick" :disabled="!player.isReady">
                 {{ player.isReady.value ? (isPlaying ? "⏹" : "▶") : "Loading soundfont..." }}
@@ -9,6 +10,7 @@
             <button class="control-btn" @click.prevent="saveMidi">💾</button>
             <button class="control-btn" @click.prevent="clear" v-if="editable">🗑️</button>
         </div>
+        -->
 
         <div class="loading-overlay" v-if="!player.isReady.value">
             Loading soundfont...<br>
@@ -34,12 +36,18 @@ interface DragBehavior {
 
 const props = withDefaults(defineProps<{
     editable?: boolean
+    interactive?: boolean
     minPitch?: number
     maxPitch?: number
+    midi?: File
+    display?: "simple" | "standard"
 }>(), {
     editable: false,
-    minPitch: 0,
+    interactive: true,
+    minPitch: undefined,
     maxPitch: 127,
+    midi: undefined,
+    display: "standard",
 })
 
 
@@ -55,6 +63,8 @@ const emit = defineEmits([
 
 const pianorollCanvas = ref<HTMLCanvasElement | null>(null)
 let ctx: CanvasRenderingContext2D | null = null
+let minPitch = 0
+let maxPitch = 127
 let scaleX = 10
 let oldScaleX = 10
 let shiftX = 10
@@ -64,7 +74,7 @@ let cursorPosition = 0
 let intervalId: ReturnType<typeof setInterval> | null = null
 let dragBehavior: DragBehavior | null = null
 const isPlaying = ref(false)
-const numPitches = props.maxPitch - props.minPitch + 1
+let numPitches = maxPitch - minPitch + 1
 const editorDiv = ref<HTMLDivElement | null>(null)
 let isDragging = false
 let midiMarkers: {beat: number, text: string}[] = []
@@ -72,6 +82,45 @@ let overrideBps: number | null = null
 let selectionBox: { x: number, y: number, width: number, height: number } | null = null
 let selectedNotes: Note[] = []
 let selectedRange: { start: number, end: number } | null = null
+
+onMounted(async () => {
+    minPitch = props.minPitch ?? 0
+    maxPitch = props.maxPitch ?? 127
+
+    if (props.midi) {
+        await loadMidiFile(props.midi)
+    }
+    
+
+    if (pianorollCanvas.value) {
+        ctx = pianorollCanvas.value.getContext("2d")
+    }
+    scaleX = pianorollCanvas.value!.clientWidth / 20
+    shiftX = pianorollCanvas.value!.clientWidth / 1200
+    emit("transform", { scaleX, shiftX })
+
+    if (!props.interactive) {
+        if (props.midi) {
+            // fit pitch
+            minPitch = Math.min(...pianoroll.getNotes().map(note => note.pitch))
+            maxPitch = Math.max(...pianoroll.getNotes().map(note => note.pitch))
+            // fit duration
+            const numBeats = pianoroll.duration
+            
+            scaleX = pianorollCanvas.value!.clientWidth / numBeats
+        }
+    }
+    
+    numPitches = maxPitch - minPitch + 1
+
+    render()
+    document.addEventListener("mousemove", handleMouseMove)
+    document.addEventListener("mouseup", handleMouseUp)
+})
+
+onUnmounted(() => {
+    stop()
+})
 
 const setSelectionBox = (selection_:{x: number, y: number, width: number, height: number} | null) => {
     selectionBox = selection_
@@ -143,10 +192,10 @@ class MoveNoteDragBehavior implements DragBehavior {
         }
         let pitchDelta = screenToPitch(event.clientY) - this._startDraggingPitch
         let beatDelta = screenToBeat(event.clientX) - this._startDraggingBeat
-        // limit pitchDelta so that (min(originalPitch)+pitchDelta) > props.minPitch
-        // and (max(originalPitch)+pitchDelta) < props.maxPitch
-        const pitchDeltaMin = props.minPitch - Math.min(...this._originalNotes.map(note => note.pitch))
-        const pitchDeltaMax = props.maxPitch - Math.max(...this._originalNotes.map(note => note.pitch))
+        // limit pitchDelta so that (min(originalPitch)+pitchDelta) > minPitch
+        // and (max(originalPitch)+pitchDelta) < maxPitch
+        const pitchDeltaMin = minPitch - Math.min(...this._originalNotes.map(note => note.pitch))
+        const pitchDeltaMax = maxPitch - Math.max(...this._originalNotes.map(note => note.pitch))
         pitchDelta = Math.min(pitchDeltaMax, pitchDelta)
         pitchDelta = Math.max(pitchDeltaMin, pitchDelta)
         // limit beatDelta so that (min(originalBeat)+beatDelta) > 0    
@@ -276,7 +325,7 @@ class SelectionDragBehavior implements DragBehavior {
             // select bars that touch the selection
             let startBar = Math.max(0, Math.floor(Math.min(this._x, this._x + this._width) / 4) * 4)
             let endBar = Math.min(10000, Math.ceil(Math.max(this._x, this._x + this._width) / 4) * 4)
-            setSelectionBox({ x: startBar, y: props.minPitch - 1, width: endBar - startBar, height: props.maxPitch - props.minPitch + 1 })
+            setSelectionBox({ x: startBar, y: minPitch - 1, width: endBar - startBar, height: maxPitch - minPitch + 1 })
 
             setSelectedRange(startBar, endBar)
             emit("select-range", startBar, endBar)
@@ -369,13 +418,7 @@ class ChromaticStyle implements Style{
         ctx.lineTo(x, height)
         ctx.stroke()
         ctx.fillStyle = "#aaaaaa"
-        if (frame % 4 == 0) {
-            ctx.fillText(
-                (frame / 4 + 1).toString(),
-                x + 5,
-                15,
-            )
-        }
+
     }
     public drawSelection(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number): void {
         ctx.fillStyle = "#4AA9450f"
@@ -451,13 +494,6 @@ class FruityDarkStyle implements Style{
         ctx.lineTo(x, height)
         ctx.stroke()
         ctx.fillStyle = "#888888"
-        if (frame % 4 == 0) {
-            ctx.fillText(
-                (frame / 4 + 1).toString(),
-                x + 7,
-                16,
-            )
-        }
     }
     public drawBackground(ctx: CanvasRenderingContext2D, width: number, height: number) {
         ctx.fillStyle = "#050505"
@@ -544,9 +580,19 @@ const render = (notify: boolean = true): void => {
             break
         }
     }
+    if (props.display === "simple") {
+        hop = Math.max(hop, 4)
+    }
     startDrawnBar = Math.max(startDrawnBar, 0)
     for (let i = startDrawnBar; i <= endDrawnBar; i += hop) {
         style.drawBarLine(ctx, i, beatToCanvas(i), height)
+        if (i % 4 == 0 && props.display === "standard") {
+            ctx.fillText(
+                (i / 4 + 1).toString(),
+                beatToCanvas(i) + 5,
+                15,
+            )
+        }
     }
 
     
@@ -676,7 +722,7 @@ const canvasToScreen = (canvasX: number): number => {
 
 const pitchToCanvas = (pitch: number): number => {
     return (
-        ((numPitches - pitch + props.minPitch - 1) / numPitches) *
+        ((numPitches - pitch + minPitch - 1) / numPitches) *
         pianorollCanvas.value!.clientHeight
     )
 }
@@ -691,12 +737,15 @@ const screenToPitch = (screenY: number): number => {
                 pianorollCanvas.value!.clientHeight) *
             numPitches,
         ) +
-        props.minPitch -
+        minPitch -
         1
-    return Math.max(Math.min(pitch, props.maxPitch), props.minPitch)
+    return Math.max(Math.min(pitch, maxPitch), minPitch)
 }
 
 const handleWheel = (event: WheelEvent): void => {
+    if (!props.interactive) {
+        return
+    }
     event.preventDefault()
 
     if (event.ctrlKey) {
@@ -723,6 +772,9 @@ const handleWheel = (event: WheelEvent): void => {
 
 const handleMouseDown = (event: MouseEvent): void => {
     // test if mouse on cursor
+    if (!props.interactive) {
+        return
+    }
     const cursorX = getCursorCanvasPosition()
     const pointerX = screenToCanvas(event.clientX)
     if (event.ctrlKey) {
@@ -795,7 +847,6 @@ const _play = (): void => {
     }
     playbackId = player.start(sequence, cursorPosition / bps(), noteOnCallback)
     player.time = cursorPosition / bps()
-    console.log("playing", player.time, sequence)
     player.timeVersion++
     const startTime = Date.now()
     let duration = sequence.notes.length > 0 ? sequence.notes[sequence.notes.length - 1].endTime : 0 
@@ -838,6 +889,17 @@ const _stop = (): void => {
         player.stop()
     }
     isPlaying.value = false
+    if (!props.interactive) {
+        // reset cursor position because the user can't move it
+        cursorPosition = 0
+        render()
+    }
+}
+
+const play = (): void => {
+    if (!isPlaying.value) {
+        _play()
+    }
 }
 
 const stop = (): void => {
@@ -846,8 +908,12 @@ const stop = (): void => {
     }
 }
 
+
 const keepCursorInScreen = (): void => {
     // update shiftX to keep cursor in screen
+    if (!props.interactive) {
+        return
+    }
     const margin = Math.min(pianorollCanvas.value!.clientWidth * 0.2, 200)
     const targetCursorX = Math.min(Math.max(margin*0.2, getCursorCanvasPosition()), pianorollCanvas.value!.clientWidth - margin)
     shiftX += (targetCursorX - getCursorCanvasPosition()) / scaleX
@@ -860,7 +926,7 @@ const getMidi = (): File => {
 }
 
 
-const loadMidiFile = async (midiFile: Blob): Promise<void> => {
+const loadMidiFile = async (midiFile: File | Blob): Promise<void> => {
     const arrayBuffer = await midiFile.arrayBuffer()
     pianoroll = new Pianoroll(arrayBuffer)
     midiMarkers = []
@@ -894,22 +960,7 @@ const handlePlayClick = () => {
     playOrStop()
 }
 
-onMounted(() => {
-    if (pianorollCanvas.value) {
-        ctx = pianorollCanvas.value.getContext("2d")
-    }
-    scaleX = pianorollCanvas.value!.clientWidth / 20
-    shiftX = pianorollCanvas.value!.clientWidth / 1200
-    emit("transform", { scaleX, shiftX })
 
-    render()
-    document.addEventListener("mousemove", handleMouseMove)
-    document.addEventListener("mouseup", handleMouseUp)
-})
-
-onUnmounted(() => {
-    stop()
-})
 
 function transform(transform: { scaleX: number, shiftX: number }, notify: boolean = true) {
     scaleX = transform.scaleX
@@ -923,7 +974,7 @@ function setBps(newBps: number|null) {
 }
 
 function selectRange(range: { start: number, end: number }) {
-    setSelectionBox({ x: range.start, y: props.minPitch - 1, width: range.end - range.start, height: props.maxPitch - props.minPitch + 1 })
+    setSelectionBox({ x: range.start, y: minPitch - 1, width: range.end - range.start, height: maxPitch - minPitch + 1 })
     setSelectedRange(range.start, range.end)
 }
 
@@ -936,7 +987,9 @@ defineExpose({
     setSelectionBox,
     getMidi,
     selectRange,
-    playOrStop
+    playOrStop,
+    play,
+    stop,
 })
 </script>
 
