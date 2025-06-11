@@ -69,15 +69,18 @@ export class Pianoroll {
 
         const midi = new Midi(midiData);
         this.bps = getBps(midi);
-        this.notes = midi.tracks[0].notes.map(
-            (note) =>
-                new Note(
-                    note.time * this.bps,
-                    note.duration * this.bps,
-                    note.midi,
-                    note.velocity*127,
-                ),
-        );
+        this.notes = [];
+        for (const track of midi.tracks) {
+            this.notes.push(...track.notes.map(
+                (note) =>
+                    new Note(
+                        note.time * this.bps,
+                        note.duration * this.bps,
+                        note.midi,
+                        note.velocity*127,
+                    ),
+            ));
+        }
         this.recalculateDuration();
     }
 
@@ -207,6 +210,12 @@ export class Pianoroll {
             this._duration = Math.max(
                 ...this.notes.map((note) => note.onset + note.duration),
             );
+    }
+
+    overlap(other: Pianoroll, shift: number = 0): void {
+        for (const note of other.notes) {
+            this.addNote(new Note(note.onset + shift, note.duration, note.pitch, note.velocity))
+        }
     }
 }
 

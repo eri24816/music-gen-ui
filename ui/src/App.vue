@@ -20,7 +20,7 @@
             </div>
             <SettingsPanel class="settings-panel" />
         </div>
-        <LeftBar />
+        <LeftBar @drag-asset="handleDragAsset" @drag-asset-end="handleDragAssetEnd" />
     </div>
 </template>
 
@@ -36,6 +36,7 @@ import SectionControl from './components/SectionControl.vue'
 import ToolBox from './components/ToolBox.vue'
 import { generate } from './api'
 import RangeSelect from './components/RangeSelect.vue'
+import type { Pianoroll } from './utils'
 
 const editor = ref<InstanceType<typeof PianorollEditor>>()
 const shiftWithEditor = ref<HTMLDivElement>()
@@ -106,12 +107,12 @@ watch([selectedRange, shiftX, scaleX], () => {
 function ShowToolbox() {
     toolboxVisible.value = true
     toolboxPosition.value = { x: selectedRange.value!.end * scaleX.value + shiftX.value * scaleX.value + 10, y: editor.value?.$el.getBoundingClientRect().height - 150 }
-    rangeSelect.value!.setRange(selectedRange.value!)
 }
 
 function handleUnselectRange(range: { start: number, end: number }) {
     toolboxVisible.value = false
     rangeSelect.value!.unselect()
+    selectedRange.value = null
 }
 
 function handleToolSelected(toolName: string) {
@@ -150,6 +151,22 @@ function handleKeyDown(event: KeyboardEvent) {
         event.preventDefault(); // Prevent page scroll
         editor.value?.playOrStop()
     }
+}
+
+function handleDragAsset(pianoroll: Pianoroll, mouseEvent: MouseEvent) {
+    // try to fit the asset into the editor
+    const startBeat = Math.round(editor.value!.screenToBeat(mouseEvent.clientX)/4) * 4
+    const endBeat = startBeat + pianoroll.duration
+    editor.value!.selectRange({ start: startBeat, end: endBeat })
+    rangeSelect.value!.setRange({ start: startBeat, end: endBeat })
+    selectedRange.value = { start: startBeat, end: endBeat }
+    ShowToolbox()
+}
+
+function handleDragAssetEnd(pianoroll: Pianoroll, mouseEvent: MouseEvent) {
+    // add the asset to the editor
+    editor.value!.getPianoroll().overlap(pianoroll, Math.round(editor.value!.screenToBeat(mouseEvent.clientX) / 4) * 4)
+    editor.value!.render()
 }
 
 </script>

@@ -617,16 +617,18 @@ const render = (notify: boolean = true): void => {
     }
 
     // Draw cursor
-    const cursorWidth = 10
-    ctx.strokeStyle = "#55FF00"
-    for (let i = 0; i < (isPlaying.value ? cursorWidth : 1); i++) {
-        ctx.beginPath()
-        ctx.globalAlpha = Math.exp(-i / (cursorWidth / 3))
-        ctx.moveTo(getCursorCanvasPosition() - i, 0)
-        ctx.lineTo(getCursorCanvasPosition() - i, height)
-        ctx.stroke()
+    if (props.interactive || isPlaying.value) {
+        const cursorWidth = 10
+        ctx.strokeStyle = "#55FF00"
+        for (let i = 0; i < (isPlaying.value ? cursorWidth : 1); i++) {
+            ctx.beginPath()
+            ctx.globalAlpha = Math.exp(-i / (cursorWidth / 3))
+            ctx.moveTo(getCursorCanvasPosition() - i, 0)
+            ctx.lineTo(getCursorCanvasPosition() - i, height)
+            ctx.stroke()
+        }
+        ctx.globalAlpha = 1
     }
-    ctx.globalAlpha = 1
 
     //display key of dragging note
     if (dragBehavior instanceof MoveNoteDragBehavior) {
@@ -978,6 +980,10 @@ function selectRange(range: { start: number, end: number }) {
     setSelectedRange(range.start, range.end)
 }
 
+const getPianoroll = (): Pianoroll => {
+    return pianoroll
+}
+
 //expose loadMidiFile to parent
 defineExpose({
     loadMidiFile,
@@ -990,6 +996,10 @@ defineExpose({
     playOrStop,
     play,
     stop,
+    getPianoroll,
+    screenToBeat,
+    screenToPitch,
+    render,
 })
 </script>
 
