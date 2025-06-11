@@ -47,10 +47,13 @@ const scaleX = ref(1)
 const shiftX = ref(0)
 
 const sections = ref<{ start: number, end: number, label: string }[]>([])
-
-sections.value.push({ start: 0, end: 4, label: "Section 1" })
-sections.value.push({ start: 4, end: 8, label: "Section 2" })
-sections.value.push({ start: 8, end: 16, label: "Section 3" })
+const defaultSectionString = "Intro:4 A:16 B:8 C:8 A:8 B:8 Outro:8"
+let start = 0
+for (const section of defaultSectionString.split(" ")) {
+    const [label, duration] = section.split(":")
+    sections.value.push({ start: start, end: start + parseInt(duration), label: label })
+    start += parseInt(duration)
+}
 
 function handleEditorTransform(transform: { scaleX: number, shiftX: number }) {
     console.log(transform)
@@ -80,7 +83,8 @@ watch(() => store.volume, (newVolume) => {
 const toolboxVisible = ref(false)
 const toolboxPosition = ref({ x: 0, y: 0 })
 const tools = ref([
-    { name: 'generate', label: 'Generate' }
+    { name: 'generate', label: 'Generate' },
+    { name: 'add-section', label: 'Add Section' }
 ])
 
 function handleEditorSelectRange(start: number, end: number) {
@@ -103,7 +107,7 @@ watch([selectedRange, shiftX, scaleX], () => {
 
 function ShowToolbox() {
     toolboxVisible.value = true
-    toolboxPosition.value = { x: selectedRange.value!.end * scaleX.value + shiftX.value * scaleX.value + 10, y: editor.value?.$el.getBoundingClientRect().height - 40 }
+    toolboxPosition.value = { x: selectedRange.value!.end * scaleX.value + shiftX.value * scaleX.value + 10, y: editor.value?.$el.getBoundingClientRect().height - 150 }
     rangeSelect.value!.setRange(selectedRange.value!)
 }
 
@@ -135,7 +139,11 @@ function handleToolSelected(toolName: string) {
             editor.value!.loadMidiFile(midi)
         })
 
+    } else if (toolName === 'add-section') {
+        sections.value.push({ start: selection.x / 4, end: (selection.x + selection.width) / 4, label: `Section ${sections.value.length + 1}` })
     }
+
+
     
 }
 
@@ -175,12 +183,10 @@ function handleKeyDown(event: KeyboardEvent) {
 .editor {
     height: 570px;
     border-radius: 6px 6px 0 0;
-    overflow: hidden;
     border: 2px solid #414141;
 }
 
 .editor-container {
-    overflow: hidden;
     position: relative;
 }
 
@@ -209,7 +215,8 @@ h2 {
 
 .shift-with-editor-container {
     position: relative;
-    overflow: hidden;
+    overflow-x: clip;
+    overflow-y: visible;
     height: 40px;
 }
 

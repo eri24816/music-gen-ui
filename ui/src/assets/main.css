@@ -11,12 +11,18 @@ body {
     font-size: 12px;
 }
 
+/* disable selection */
+* {
+    user-select: none;
+}
+
 button {
     background: #2B2B2B;
     color: #fff;
     border: none;
     padding: 8px 16px;
     border-radius: 4px;
+    outline: none;
 }
 
 button:hover {

@@ -715,7 +715,7 @@ const handleWheel = (event: WheelEvent): void => {
         shiftX = Math.min(shiftX, 100 / scaleX)
         event.preventDefault()
     } else {
-        shiftX -= (0.5 * event.deltaY) / scaleX
+        shiftX -= (1 * (event.deltaY+event.deltaX)) / scaleX
         shiftX = Math.min(shiftX, 100 / scaleX)
     }
     render()

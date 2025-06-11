@@ -11,8 +11,8 @@ class SegmentFullSongMusicGenServer(MusicGenServer):
         print('creating model')
         self.model = cast(SegmentFullSongModel,create_model('segment_full_song.yaml'))
         print('loading model')
-        self.model.load_state_dict(safetensors.torch.load_file('epoch=41-step=250000.safetensors'))
-        self.model.eval()
+        self.model.load_state_dict(safetensors.torch.load_file('epoch=74-step=450000.safetensors'))
+        self.model.eval() 
         self.model.to(device)
         print('model loaded')
 

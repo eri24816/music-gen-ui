@@ -40,6 +40,7 @@ const position = computed(() => ({
 .toolbox {
     position: absolute;
     display: flex;
+    flex-direction: column;
     gap: 4px;
     padding: 4px;
     background: #00000055;

@@ -6,10 +6,35 @@
             :style="{
                 width: `${(section.end - section.start)*scaleX*4}px`, 
                 left: `${section.start*scaleX*4}px`, 
-                backgroundColor: sectionLabelToColor[section.label]
+                backgroundColor: computeSectionLabelToColor(section.label)
             }"
         >
-            {{section.label}} ({{section.end - section.start}})
+            <span v-if="!editingIndex[index]" @dblclick="startEditing(index)">
+                {{section.label}} ({{section.end - section.start}})
+            </span>
+            <div v-else class="edit-container">
+                <input
+                    v-model="editingText"
+                    @blur="handleBlur"
+                    @keyup.enter="finishEditing(index)"
+                    @keyup.down="focusDropdown"
+                    ref="editInput"
+                    type="text"
+                    class="section-input"
+                >
+                <div v-if="filteredLabels.length" class="labels-dropdown" ref="dropdownRef">
+                    <div 
+                        v-for="label in filteredLabels" 
+                        :key="label"
+                        class="label-option"
+                        :class="{ 'selected': label === selectedLabel }"
+                        @mousedown.prevent="selectLabel(label, index)"
+                        @mouseover="selectedLabel = label"
+                    >
+                        {{ label }}
+                    </div>
+                </div>
+            </div>
             <div class="section-handle left"  @mousedown="startDrag($event, index, 'start')"></div>
             <div class="section-handle right" v-if="index == sections.length - 1" @mousedown="startDrag($event, index, 'end')"></div>
         </div>
@@ -17,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 
 const props = defineProps<{
     scaleX: number,
@@ -44,6 +69,13 @@ const colorPresets = [
 
 const sectionLabelToColor = ref<{ [key: string]: string }>({})
 
+function computeSectionLabelToColor(label: string) {
+    if (!sectionLabelToColor.value[label]) {
+        sectionLabelToColor.value[label] = colorPresets[Object.keys(sectionLabelToColor.value).length]
+    }
+    return sectionLabelToColor.value[label]
+}
+
 // Initialize colors for existing sections
 props.sections.forEach(section => {
     if (!sectionLabelToColor.value[section.label]) {
@@ -57,6 +89,22 @@ const draggedEdge = ref<'start' | 'end'>('start')
 const initialMouseX = ref(0)
 const initialSectionTime = ref(0)
 let lastTime = -1
+
+const editingIndex = ref<{ [key: number]: boolean }>({})
+const editingText = ref('')
+const editInput = ref<HTMLInputElement[]>([])
+
+const dropdownRef = ref<HTMLElement | null>(null)
+const selectedLabel = ref('')
+const closeTimeout = ref<number | null>(null)
+
+const uniqueLabels = computed(() => {
+    return [...new Set(props.sections.map(s => s.label))]
+})
+
+const filteredLabels = computed(() => {
+    return uniqueLabels.value
+})
 
 function startDrag(event: MouseEvent, sectionIndex: number, edge: 'start' | 'end') {
     isDragging.value = true
@@ -129,6 +177,52 @@ function stopDrag() {
         props.sections.splice(toDelete[i], 1)
     }
 }
+
+function startEditing(index: number) {
+    editingText.value = props.sections[index].label
+    editingIndex.value = { [index]: true }
+    nextTick(() => {
+        if (editInput.value[index]) {
+            editInput.value[index].focus()
+        }
+    })
+}
+
+function finishEditing(index: number) {
+    if (editingText.value.trim()) {
+        props.sections[index].label = editingText.value.trim()
+    }
+    editingIndex.value = {}
+    editingText.value = ''
+}
+
+
+function handleBlur() {
+    closeTimeout.value = window.setTimeout(() => {
+        const currentIndex = Object.keys(editingIndex.value)[0]
+        if (currentIndex !== undefined) {
+            finishEditing(parseInt(currentIndex))
+        }
+    }, 0)
+}
+
+function selectLabel(label: string, index: number) {
+    if (closeTimeout.value) {
+        clearTimeout(closeTimeout.value)
+    }
+    editingText.value = label
+    finishEditing(index)
+}
+
+function focusDropdown() {
+    nextTick(() => {
+        const dropdown = dropdownRef.value
+        if (dropdown && dropdown.firstElementChild) {
+            (dropdown.firstElementChild as HTMLElement).focus()
+            selectedLabel.value = filteredLabels.value[0]
+        }
+    })
+}
 </script>
 
 <style scoped>
@@ -143,7 +237,6 @@ function stopDrag() {
     line-height: 20px;
     text-align: center;
     user-select: none;
-    overflow: hidden;
 }
 
 .section-handle {
@@ -165,5 +258,47 @@ function stopDrag() {
 
 .section-handle.right {
     right: -3px;
+}
+
+.edit-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.labels-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 150px;
+    overflow-y: auto;
+    background-color: #2a2a2a;
+    border: 1px solid #3a3a3a;
+    border-radius: 4px;
+    z-index: 1000;
+    margin: 2px auto;
+    width: 90%;
+}
+
+.label-option {
+    padding: 4px 8px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.label-option:hover,
+.label-option.selected {
+    background-color: #3a3a3a;
+}
+
+.section-input {
+    background: transparent;
+    border: none;
+    color: inherit;
+    font: inherit;
+    text-align: center;
+    width: 90%;
+    outline: none;
 }
 </style> 
