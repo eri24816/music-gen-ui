@@ -37,6 +37,7 @@ import ToolBox from './components/ToolBox.vue'
 import { generate } from './api'
 import RangeSelect from './components/RangeSelect.vue'
 import type { Pianoroll } from './utils'
+import { Note } from './utils'
 
 const editor = ref<InstanceType<typeof PianorollEditor>>()
 const shiftWithEditor = ref<HTMLDivElement>()
@@ -133,9 +134,45 @@ function handleToolSelected(toolName: string) {
                 end_bar: s.end,
                 label: s.label
             })),
-            song_duration: 80*32
-        }).then(midi => {
-            editor.value!.loadMidiFile(midi)
+            song_duration: sections.value.reduce((max, s) => Math.max(max, s.end), 0)*32
+        }).then(async (response: Response) => {
+            const reader = response.body!.getReader()
+            const decoder = new TextDecoder()
+            
+            // Clear the existing notes in the range
+            const pianoroll = editor.value!.getPianoroll()
+            const notesToRemove = pianoroll.getNotesOnsetBetween(selection.x, selection.x + selection.width)
+            for (const note of notesToRemove) {
+                pianoroll.removeNote(note)
+            }
+
+            const lastNoteOfPitch = new Map<number, Note>()
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+
+                const noteData = JSON.parse(decoder.decode(value))
+                let duration = 0
+                if (noteData[3] == 0) {
+                    duration = 32 - noteData[0] % 32
+                } else {
+                    duration = noteData[3]
+                }
+                const pitch = noteData[1]
+                const note = new Note(noteData[0] / 8, duration / 8, noteData[1], noteData[2])
+
+                const last = lastNoteOfPitch.get(pitch)
+                if (last) {
+                    if(last.onset + last.duration > note.onset) {
+                        last.duration = note.onset - last.onset
+                    }
+                }
+
+                pianoroll.addNote(note)
+                lastNoteOfPitch.set(noteData[1], note)
+                editor.value!.render()
+                editor.value!.updatePlayerNotes()
+            }
         })
 
     } else if (toolName === 'add-section') {

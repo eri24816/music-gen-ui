@@ -22,22 +22,13 @@ type GenerateParams = {
  * @param midiFile - The MIDI file to transform
  * @returns Promise containing the generated MIDI file as a Blob
  */
-export async function generate(midiFile: File, params: GenerateParams): Promise<Blob> {
+export async function generate(midi: Blob, params: any): Promise<Response> {
   const formData = new FormData();
-  formData.append('midi_file', midiFile);
+  formData.append('midi_file', midi);
   formData.append('params', JSON.stringify(params));
   
-  try {
-    const response = await axios.post('/api/generate/', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      responseType: 'blob',
-    });
-
-    return response.data;
-  } catch (error) {
-    console.error('Error generating music:', error);
-    throw error;
-  }
+  return fetch('/api/generate/', {
+    method: 'POST',
+    body: formData
+  });
 }

@@ -207,6 +207,7 @@ class MoveNoteDragBehavior implements DragBehavior {
                 this._originalNotes[i].onset + beatDelta,
                 this._originalNotes[i].pitch+pitchDelta,
                 note.velocity,
+                this._originalNotes[i].duration,
             )
             newNotes.push(newNote)
             pianoroll.addNote(newNote)
@@ -348,8 +349,7 @@ const updatePlayerNotes = (): void => {
     for (const note of pianoroll.getNotes()) {
         notes.push({ pitch: note.pitch, startTime: note.onset / bps(), endTime: (note.onset + note.duration) / bps(), velocity: note.velocity })
     }
-    player.stop(true)
-    playbackId = player.start({ notes: notes }, cursorPosition / bps() + 0.1)
+    player.updateNotes(notes)
 }
 
 
@@ -650,6 +650,7 @@ const createNote = (
     onset: number,
     pitch: number,
     velocity: number = 80,
+    duration: number|null = null,
     snap = 0.125,
 ): Note => {
     onset = Math.round(onset / snap) * snap
@@ -660,13 +661,13 @@ const createNote = (
         onset,
         onset - (onset % 4) + 4,
     )
-    let duration = (-onset % 4) + 4
+    let duration_ = duration ?? (-onset % 4) + 4
     for (const note of notesInBar) {
         if (note.pitch === pitch) {
-            duration = Math.min(duration, note.onset - onset)
+            duration = Math.min(duration_, note.onset - onset)
         }
     }
-    duration = Math.max(Math.round(duration / snap) * snap, snap)
+    duration = Math.max(Math.round(duration_ / snap) * snap, snap)
     return new Note(onset, duration, pitch, velocity)
 }
 
@@ -1000,6 +1001,7 @@ defineExpose({
     screenToBeat,
     screenToPitch,
     render,
+    updatePlayerNotes,
 })
 </script>
 

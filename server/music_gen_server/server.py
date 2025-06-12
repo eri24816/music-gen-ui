@@ -1,7 +1,9 @@
-import io
-from fastapi import FastAPI, Form, Response, UploadFile
-from fastapi.responses import FileResponse
+import json
+from typing import AsyncGenerator
+from fastapi import FastAPI, Form, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
 import miditoolkit.midi.parser
+from music_data_analysis import Note
 from pydantic import BaseModel
 import uvicorn
 
@@ -44,15 +46,16 @@ class MusicGenServer:
         """Regular file serving"""
         return FileResponse(path=f'{self._frontend_dir}/{path}')
     
-    def _generate(self, midi_file: UploadFile, params: str= Form()):
+    async def _generate(self, midi_file: UploadFile, params: str= Form()):
         params_obj = GenerateParams.model_validate_json(params)
         midi = miditoolkit.midi.parser.MidiFile(file=midi_file.file)
-        result_midi = self.generate(midi, params_obj)
-        file = io.BytesIO()
-        result_midi.dump(file=file)
-        return Response(content=file.getvalue(), media_type="audio/midi")
+        return StreamingResponse(self._generate_stream(midi, params_obj), media_type="audio/midi")
+    
+    async def _generate_stream(self, midi: miditoolkit.midi.parser.MidiFile, params: GenerateParams) -> AsyncGenerator[bytes, None]:
+        async for onset, pitch, velocity, offset in self.generate(midi, params):
+            yield (json.dumps([onset, pitch, velocity, offset]) + "\n").encode('utf-8')
 
     # abstract methods
-    def generate(self, midi: miditoolkit.midi.parser.MidiFile, params: GenerateParams) -> miditoolkit.midi.parser.MidiFile:
+    async def generate(self, midi: miditoolkit.midi.parser.MidiFile, params: GenerateParams) -> AsyncGenerator[Note, None]:
         raise NotImplementedError("Not implemented")
     

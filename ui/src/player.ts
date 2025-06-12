@@ -131,41 +131,45 @@ export class Player {
         this.piano.stop();
     }
 
+    private currentNoteIdx = 0
+    private currentTime = 0
+
+    updateNotes(notes: INote[]) {
+        this.notes = notes;
+        
+        // sort notes by start time
+        this.notes.sort((a, b) => a.startTime - b.startTime);
+
+        for (this.currentNoteIdx = 0; this.currentNoteIdx < this.notes.length; this.currentNoteIdx++) {
+            if (this.notes[this.currentNoteIdx].startTime >= this.currentTime) {
+                break;
+            }
+        }
+    }
+
     start(sequence: { notes: INote[] },  startTime: number = 0, noteOnCallback: (note: INote) => void = () => {}) {
-        this.notes = sequence.notes;
         this.startOffset = startTime;
         this.playing = true;
         this.playbackId++;
-
         
         const currentId = this.playbackId;
         const startTimeStamp = performance.now();
         
-
-        // sort notes by start time
-        this.notes.sort((a, b) => a.startTime - b.startTime);
-        const duration = this.notes[this.notes.length - 1].endTime
-
-        let currentNoteIdx = 0
-        for (; currentNoteIdx < this.notes.length; currentNoteIdx++) {
-            if (this.notes[currentNoteIdx].startTime >= startTime - 0.01) {
-                break;
-            }
-        }
+        this.currentTime = startTime - 0.01;
+        this.updateNotes(sequence.notes);
 
         const tick = () => {
             if (currentId !== this.playbackId) return;
             
-            const currentTime = (performance.now() - startTimeStamp) / 1000 + this.startOffset;
-            this.time = currentTime;
+            this.currentTime = (performance.now() - startTimeStamp) / 1000 + this.startOffset;
+            this.time = this.currentTime;
             this.timeVersion++;
 
 
-            this.piano.update(currentTime);
-
-            for (; currentNoteIdx < this.notes.length; currentNoteIdx++) {
-                const note = this.notes[currentNoteIdx];
-                if (currentTime >= note.startTime) {
+            this.piano.update(this.currentTime);
+            for (; this.currentNoteIdx < this.notes.length; this.currentNoteIdx++) {
+                const note = this.notes[this.currentNoteIdx];
+                if (this.currentTime >= note.startTime) {
                     this.piano.playNoteImmediate(note.pitch, note.velocity, note.endTime - note.startTime);
                     noteOnCallback(note);
                 } else {
