@@ -96,4 +96,8 @@ defineExpose({
     height: 100%;
     background-color: #45A96B;
 }
+
+.range-select-container:hover {
+    background-color: #2f3a31;
+}
 </style>

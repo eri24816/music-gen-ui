@@ -96,7 +96,7 @@ onMounted(async () => {
     if (pianorollCanvas.value) {
         ctx = pianorollCanvas.value.getContext("2d")
     }
-    scaleX = pianorollCanvas.value!.clientWidth / 20
+    scaleX = pianorollCanvas.value!.clientWidth / 200
     shiftX = pianorollCanvas.value!.clientWidth / 1200
     emit("transform", { scaleX, shiftX })
 

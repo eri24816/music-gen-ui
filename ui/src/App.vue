@@ -50,10 +50,11 @@ const shiftX = ref(0)
 
 const sections = ref<{ start: number, end: number, label: string, isSeed: boolean }[]>([])
 const defaultSectionString = "Intro:4 A:8 B:8 C:8 D:8 C:8 Outro:8"
+const defaultSeedSectionIdx = 3
 let start = 0
 for (const section of defaultSectionString.split(" ")) {
     const [label, duration] = section.split(":")
-    sections.value.push({ start: start, end: start + parseInt(duration), label: label, isSeed: false })
+    sections.value.push({ start: start, end: start + parseInt(duration), label: label, isSeed: defaultSeedSectionIdx === sections.value.length })
     start += parseInt(duration)
 }
 
@@ -83,8 +84,8 @@ watch(() => store.volume, (newVolume) => {
 const toolboxVisible = ref(false)
 const toolboxPosition = ref({ x: 0, y: 0 })
 const tools = ref([
-    { name: 'generate', label: 'Generate' },
-    { name: 'add-section', label: 'Add Section' },
+    { name: 'generate', label: 'Generate!' },
+    { name: 'add-section', label: 'Add section here' },
     { name: 'set-as-seed', label: 'Set segment as Seed' }
 ])
 
@@ -178,7 +179,16 @@ function handleToolSelected(toolName: string) {
         })
 
     } else if (toolName === 'add-section') {
+        // check if any section is overlapping with the selection
+        for (const section of sections.value) {
+            const selectionStartBar = Math.round(selection.x / 4)
+            const selectionEndBar = Math.round((selection.x + selection.width) / 4)
+            if (section.start <= selectionStartBar && section.end > selectionStartBar) return
+            if (section.start < selectionEndBar && section.end >= selectionEndBar) return
+        }
         sections.value.push({ start: selection.x / 4, end: (selection.x + selection.width) / 4, label: `Section ${sections.value.length + 1}`, isSeed: false })
+        // sort sections by start
+        sections.value.sort((a, b) => a.start - b.start)
     } else if (toolName === 'set-as-seed') {
         // find the first section that contains the selection
         const section = sections.value.find(s => selection.x / 4 >= s.start && selection.x / 4 + selection.width / 4 <= s.end)

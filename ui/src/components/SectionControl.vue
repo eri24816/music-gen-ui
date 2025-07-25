@@ -8,8 +8,9 @@
                 left: `${section.start*scaleX*4}px`, 
                 backgroundColor: computeSectionLabelToColor(section.label)
             }"
+            @click="startEditing(index)"
         >
-            <span v-if="!editingIndex[index]" @dblclick="startEditing(index)">
+            <span v-if="!editingIndex[index]" >
                 {{section.label}} ({{section.end - section.start}}) {{section.isSeed ? '(Seed)' : ''}}
             </span>
             <div v-else class="edit-container">
@@ -18,7 +19,7 @@
                     @blur="handleBlur"
                     @keyup.enter="finishEditing(index)"
                     @keyup.down="focusDropdown"
-                    ref="editInput"
+                    :ref="el => editInput[index] = el"
                     type="text"
                     class="section-input"
                 >
@@ -36,7 +37,7 @@
                 </div>
             </div>
             <div class="section-handle left"  @mousedown="startDrag($event, index, 'start')"></div>
-            <div class="section-handle right" v-if="index == sections.length - 1" @mousedown="startDrag($event, index, 'end')"></div>
+            <div class="section-handle right" @mousedown="startDrag($event, index, 'end')"></div>
         </div>
     </div>
 </template>
@@ -92,7 +93,7 @@ let lastTime = -1
 
 const editingIndex = ref<{ [key: number]: boolean }>({})
 const editingText = ref('')
-const editInput = ref<HTMLInputElement[]>([])
+const editInput = ref<{ [key: number]: HTMLInputElement | null }>({})
 
 const dropdownRef = ref<HTMLElement | null>(null)
 const selectedLabel = ref('')
@@ -131,34 +132,50 @@ function handleDrag(event: MouseEvent) {
     if (lastTime == newTime) return
     
     lastTime = newTime
-    const currentSection = props.sections[draggedSectionIndex.value]
+    const draggedSection = props.sections[draggedSectionIndex.value]
 
     if (draggedEdge.value === 'start') {
-        // Don't allow start to go beyond end
-        if (newTime > currentSection.end)
-            newTime = currentSection.end
-        // Update previous section's end if it exists
-        if (draggedSectionIndex.value > 0) {
-            const prevSection = props.sections[draggedSectionIndex.value - 1]
-            if (newTime < prevSection.start) {
-                newTime = prevSection.start
-            }
-            prevSection.end = newTime
+        // move left
+        // prevent the first section from moving to negative time
+        let totalOccupiedLengthInLeft = 0
+        for (let i = draggedSectionIndex.value - 1; i >= 0; i--) {
+            const section = props.sections[i]
+            totalOccupiedLengthInLeft += (section.end - section.start)
         }
-        currentSection.start = newTime
-    
+        let targetPos = Math.max(newTime, totalOccupiedLengthInLeft)
+        // the section at least has 1 bar length
+        targetPos = Math.min(targetPos, draggedSection.end - 1)
+
+        draggedSection.start = targetPos
+        for (let i = draggedSectionIndex.value - 1; i >= 0; i--) {
+            const section = props.sections[i]
+            const sectionWidth = (section.end - section.start)
+            if (targetPos < section.end) {
+                section.end = targetPos
+                section.start = section.end - sectionWidth
+                targetPos = section.start
+            } else {
+                break
+            }
+        }
     } else {
-        if (newTime < currentSection.start)
-            newTime = currentSection.start
-        // Update next section's start if it exists
-        if (draggedSectionIndex.value < props.sections.length - 1) {
-            const nextSection = props.sections[draggedSectionIndex.value + 1]
-            if (newTime > nextSection.end) {
-                newTime = nextSection.end
+        // move right
+        let targetPos = newTime
+        // the section at least has 1 bar length
+        targetPos = Math.max(targetPos, draggedSection.start + 1)
+
+        draggedSection.end = targetPos
+        for (let i = draggedSectionIndex.value + 1; i < props.sections.length; i++) {
+            const section = props.sections[i]
+            const sectionWidth = (section.end - section.start)
+            if (targetPos > section.start) {
+                section.start = targetPos
+                section.end = section.start + sectionWidth
+                targetPos = section.end
+            } else {
+                break
             }
-            nextSection.start = newTime
         }
-        currentSection.end = newTime
     }
 }
 
@@ -179,11 +196,16 @@ function stopDrag() {
 }
 
 function startEditing(index: number) {
+
+
     editingText.value = props.sections[index].label
     editingIndex.value = { [index]: true }
     nextTick(() => {
         if (editInput.value[index]) {
             editInput.value[index].focus()
+            editInput.value[index].selectionStart = 0
+            editInput.value[index].selectionEnd = editInput.value[index].value.length
+            console.log(editInput.value[index].selectionStart, editInput.value[index].selectionEnd)
         }
     })
 }
@@ -237,6 +259,7 @@ function focusDropdown() {
     line-height: 20px;
     text-align: center;
     user-select: none;
+    cursor: pointer;
 }
 
 .section-handle {
@@ -253,11 +276,11 @@ function focusDropdown() {
 }
 
 .section-handle.left {
-    left: -3px;
+    left: 0px;
 }
 
 .section-handle.right {
-    right: -3px;
+    right: 0px;
 }
 
 .edit-container {
