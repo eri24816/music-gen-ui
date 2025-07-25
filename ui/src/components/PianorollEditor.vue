@@ -847,7 +847,6 @@ const _play = (): void => {
     player.time = cursorPosition / bps()
     player.timeVersion++
     const startTime = Date.now()
-    let duration = sequence.notes.length > 0 ? sequence.notes[sequence.notes.length - 1].endTime : 0 
     // move the cursor in the event loop
     intervalId = setInterval(() => {
         if (player.playbackId !== playbackId) {
@@ -861,10 +860,7 @@ const _play = (): void => {
         }
         render()
 
-        let endTime = duration * bps()
-        if (selectedRange) {
-            endTime = selectedRange.end
-        }
+        let endTime = player.getEndTime() * bps()
         if (player.time! * bps() > endTime) {
             stop()
             if (selectedRange) {

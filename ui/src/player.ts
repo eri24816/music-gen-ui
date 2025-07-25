@@ -130,6 +130,10 @@ export class Player {
         this.piano = new AutoKeyupPiano(tonePiano);
     }
 
+    getEndTime() {
+        return this.notes.length > 0 ? this.notes[this.notes.length - 1].endTime : 0;
+    }
+
     setVolume(volume: number) {
         this.gain.gain.value = volume;
     }
