@@ -51,7 +51,6 @@ class MusicGenServer:
         print(f"client_id: {client_id}")
         params_obj = GenerateParams.model_validate_json(params)
         midi = miditoolkit.midi.parser.MidiFile(file=midi_file.file)
-        midi.dump('ai2.mid')
         return StreamingResponse(self._generate_stream(midi, params_obj, client_id), media_type="audio/midi")
     
     async def _generate_stream(self, midi: miditoolkit.midi.parser.MidiFile, params: GenerateParams, client_id: str) -> AsyncGenerator[bytes, None]:

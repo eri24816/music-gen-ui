@@ -1,6 +1,12 @@
 <template>
     <div class="settings-panel">
         <div class="setting-item">
+            <button @click="handleLoadMidi">Load MIDI</button>
+        </div>
+        <div class="setting-item">
+            <button @click="handleSaveMidi">Save MIDI as</button>
+        </div>
+        <div class="setting-item">
             <label>BPM</label>
             <SliderComp :min="40" :max="240" v-model="bpm" />
         </div>
@@ -9,16 +15,13 @@
             <SliderComp v-model="store.volume" :min="0" :max="1" :step="0.01" />
         </div>
         <div class="setting-item">
-            <label>MIDI Port</label>
             <input 
                 type="checkbox" 
                 id="use-midi" 
                 v-model="store.useMidiOut"
             />
-            <label for="use-midi">Use MIDI</label>
-        </div>
-        <div class="setting-item">
-            <select v-model="store.midiPort">
+            <label for="use-midi">MIDI out</label>
+            <select v-model="store.midiPort" v-if="store.useMidiOut">
                 <option v-for="port in store.midiPorts.values()" :value="port">{{ port.name }}</option>
             </select>
         </div>
@@ -36,6 +39,16 @@ const bpm = computed({
     get: () => Math.round(store.bps * 60.0),
     set: (val) => store.bps = val / 60.0
 })
+
+const emit = defineEmits(['load-midi', 'save-midi'])
+
+function handleLoadMidi() {
+    emit('load-midi')
+}
+
+function handleSaveMidi() {
+    emit('save-midi')
+}
 </script>
 
 <style scoped>

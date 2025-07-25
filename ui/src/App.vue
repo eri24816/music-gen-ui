@@ -18,7 +18,7 @@
                     class="toolbox"
                 />
             </div>
-            <SettingsPanel class="settings-panel" />
+            <SettingsPanel class="settings-panel" @load-midi="handleLoadMidi" @save-midi="handleSaveMidi" />
         </div>
         <LeftBar @drag-asset="handleDragAsset" @drag-asset-end="handleDragAssetEnd" />
     </div>
@@ -228,6 +228,29 @@ function handleDragAssetEnd(pianoroll: Pianoroll, mouseEvent: MouseEvent) {
     editor.value!.render()
 }
 
+function handleLoadMidi() {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.mid,.midi'
+    input.onchange = (event) => {
+        const file = (event.target as HTMLInputElement).files?.[0]
+        if (file) {
+            editor.value!.loadMidiFile(file)
+        }
+    }
+    input.click()
+}
+
+function handleSaveMidi() {
+    editor.value!.toMidiFile().then(file => {
+    const url = URL.createObjectURL(file)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = file.name
+        a.click()
+        URL.revokeObjectURL(url)
+    })
+}
 </script>
 
 <style scoped>

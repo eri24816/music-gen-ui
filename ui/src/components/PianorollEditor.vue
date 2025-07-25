@@ -920,17 +920,18 @@ const getMidi = (): File => {
 const loadMidiFile = async (midiFile: File | Blob): Promise<void> => {
     const arrayBuffer = await midiFile.arrayBuffer()
     pianoroll = new Pianoroll(arrayBuffer)
-    midiMarkers = []
-    const midi = new Midi(arrayBuffer);
-    for( const event of midi.header.meta) {
-        if (event.type === "marker") {
-            midiMarkers.push({beat: event.ticks / midi.header.ppq, text: event.text})
-        }
-    }
-    
+
     render()
 
 }
+
+const toMidiFile = async (): Promise<File> => {
+    const midi = pianoroll.toMidi()
+    const blob = new Blob([midi.toArray()], { type: "audio/midi" })
+    const file = new File([blob], "generated.mid", { type: "audio/midi", lastModified: Date.now() })
+    return file
+}
+
 
 const clear = (): void => {
     pianoroll = new Pianoroll()
@@ -1004,7 +1005,8 @@ defineExpose({
     screenToPitch,
     render,
     updatePlayerNotes,
-    handleDelete
+    handleDelete,
+    toMidiFile
 })
 </script>
 
