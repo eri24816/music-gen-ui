@@ -8,12 +8,26 @@
             <label>Volume</label>
             <SliderComp v-model="store.volume" :min="0" :max="1" :step="0.01" />
         </div>
+        <div class="setting-item">
+            <label>MIDI Port</label>
+            <input 
+                type="checkbox" 
+                id="use-midi" 
+                v-model="store.useMidiOut"
+            />
+            <label for="use-midi">Use MIDI</label>
+        </div>
+        <div class="setting-item">
+            <select v-model="store.midiPort">
+                <option v-for="port in store.midiPorts.values()" :value="port">{{ port.name }}</option>
+            </select>
+        </div>
     </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useStore } from '@/stores/bpmStore'
+import { useStore } from '@/stores/store'
 import NullableSlider from './NullableSlider.vue'
 import SliderComp from './SliderComp.vue'
 

@@ -1,5 +1,5 @@
 <template>
-    <div class="main" tabindex="0" @keydown="handleKeyDown">
+    <div class="main" tabindex="0" @keydown="handleKeyDown" @wheel.prevent>
         <div class="center-container">
             <div class="editor-container">
                 <PianorollEditor ref="editor" :editable="true" class="editor" @transform="handleEditorTransform" @select-range="handleEditorSelectRange" @unselect-range="handleUnselectRange" :min-pitch="21" :max-pitch="108"/>
@@ -29,8 +29,8 @@ import { ref, onMounted, watch } from 'vue'
 import { marked } from 'marked'
 import PianorollEditor from './components/PianorollEditor.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
-import { useStore } from '@/stores/bpmStore'
-import { player } from './player'
+import { useStore } from '@/stores/store'
+import { getPlayer } from './player'
 import LeftBar from './components/LeftBar.vue'
 import SectionControl from './components/SectionControl.vue'
 import ToolBox from './components/ToolBox.vue'
@@ -48,12 +48,12 @@ const selectedRange = ref<{ start: number, end: number } | null>(null)
 const scaleX = ref(1)
 const shiftX = ref(0)
 
-const sections = ref<{ start: number, end: number, label: string }[]>([])
-const defaultSectionString = "Intro:4 A:16 B:8 C:8 A:8 B:8 Outro:8"
+const sections = ref<{ start: number, end: number, label: string, isSeed: boolean }[]>([])
+const defaultSectionString = "Intro:4 A:8 B:8 C:8 D:8 C:8 Outro:8"
 let start = 0
 for (const section of defaultSectionString.split(" ")) {
     const [label, duration] = section.split(":")
-    sections.value.push({ start: start, end: start + parseInt(duration), label: label })
+    sections.value.push({ start: start, end: start + parseInt(duration), label: label, isSeed: false })
     start += parseInt(duration)
 }
 
@@ -77,14 +77,15 @@ watch(() => store.bps, (newBps) => {
 
 
 watch(() => store.volume, (newVolume) => {
-    player.setVolume(newVolume)
+    getPlayer().setVolume(newVolume)
 })
 
 const toolboxVisible = ref(false)
 const toolboxPosition = ref({ x: 0, y: 0 })
 const tools = ref([
     { name: 'generate', label: 'Generate' },
-    { name: 'add-section', label: 'Add Section' }
+    { name: 'add-section', label: 'Add Section' },
+    { name: 'set-as-seed', label: 'Set segment as Seed' }
 ])
 
 function handleEditorSelectRange(start: number, end: number) {
@@ -132,7 +133,8 @@ function handleToolSelected(toolName: string) {
             segments: sections.value.map(s => ({
                 start_bar: s.start,
                 end_bar: s.end,
-                label: s.label
+                label: s.label,
+                is_seed: s.isSeed
             })),
             song_duration: sections.value.reduce((max, s) => Math.max(max, s.end), 0)*32
         }).then(async (response: Response) => {
@@ -176,9 +178,17 @@ function handleToolSelected(toolName: string) {
         })
 
     } else if (toolName === 'add-section') {
-        sections.value.push({ start: selection.x / 4, end: (selection.x + selection.width) / 4, label: `Section ${sections.value.length + 1}` })
+        sections.value.push({ start: selection.x / 4, end: (selection.x + selection.width) / 4, label: `Section ${sections.value.length + 1}`, isSeed: false })
+    } else if (toolName === 'set-as-seed') {
+        // find the first section that contains the selection
+        const section = sections.value.find(s => selection.x / 4 >= s.start && selection.x / 4 + selection.width / 4 <= s.end)
+        if (section) {
+            for (const s of sections.value) {
+                s.isSeed = false
+            }
+            section.isSeed = true
+        }
     }
-
 
     
 }
@@ -187,6 +197,8 @@ function handleKeyDown(event: KeyboardEvent) {
     if (event.code === 'Space') {
         event.preventDefault(); // Prevent page scroll
         editor.value?.playOrStop()
+    } else if (event.code === 'Delete') {
+        editor.value?.handleDelete(event)
     }
 }
 

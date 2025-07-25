@@ -1,7 +1,7 @@
 import { ref, watch, type Ref } from 'vue';
 import { Piano } from '@tonejs/piano';
 import * as Tone from 'tone';
-import { useStore } from './stores/bpmStore'
+import { useStore } from './stores/store'
 
 export interface INote {
     pitch: number
@@ -14,6 +14,8 @@ export class AutoKeyupPiano {
     /** Map to store pending note offsets (pitch -> offset) */
     private pendingOffsets: Map<number, number> = new Map();
     private now: number = 0
+
+    store = useStore()
     /**
      * Creates an instance of AutoKeyupPiano.
      * @param {Piano} piano - The Piano instance to be wrapped.
@@ -22,22 +24,37 @@ export class AutoKeyupPiano {
         this.piano = piano;
     }
 
+    keyUp(pitch: number) {
+        if (this.store.useMidiOut) {
+            this.store.midiPort?.send([0x80, pitch, 0]);
+        } else {
+            this.piano.keyUp({ midi: pitch });
+        }
+    }
+
+    keyDown(pitch: number, velocity: number) {
+        if (this.store.useMidiOut) {
+            this.store.midiPort?.send([0x90, pitch, velocity]);
+        } else {
+            this.piano.keyDown({ midi: pitch, velocity: velocity/127 });
+        }
+    }
     /**
      * Plays a note and schedules its key-up event.
      */
     playNote(onset: number, pitch: number, velocity: number, offset: number) {
         if (this.pendingOffsets.has(pitch)) {
-            this.piano.keyUp({ midi: pitch, time: offset });
+            this.keyUp(pitch);
         }
-        this.piano.keyDown({ midi: pitch, velocity: velocity/127, time: onset });
+        this.keyDown(pitch, velocity);
         this.pendingOffsets.set(pitch, offset);
     }
 
     playNoteImmediate(pitch: number, velocity: number, duration: number) {
         if (this.pendingOffsets.has(pitch)) {
-            this.piano.keyUp({ midi: pitch });
+            this.keyUp(pitch);
         }
-        this.piano.keyDown({ midi: pitch, velocity: velocity/127 });
+        this.keyDown(pitch, velocity);
         this.pendingOffsets.set(pitch, this.now + duration);
     }
 
@@ -46,7 +63,7 @@ export class AutoKeyupPiano {
      * @param {INote} note - The note to be stopped.
      */
     stopNote(note: INote) {
-        this.piano.keyUp({ midi: note.pitch });
+        this.keyUp(note.pitch);
         this.pendingOffsets.delete(note.pitch);
     }
 
@@ -57,7 +74,7 @@ export class AutoKeyupPiano {
     update(time: number) {
         for (const [pitch, offset] of this.pendingOffsets.entries()) {
             if (time > offset) {
-                this.piano.keyUp({ midi: pitch });
+                this.keyUp(pitch);
                 this.pendingOffsets.delete(pitch);
             }
         }
@@ -70,9 +87,9 @@ export class AutoKeyupPiano {
     stop(allowSustain: boolean = false) {
         for (const [pitch, offset] of this.pendingOffsets.entries()) {
             if (allowSustain) {
-                this.piano.keyUp({ midi: pitch, time: Tone.now() + (offset - this.now) });
+                this.keyUp(pitch);
             } else {
-                this.piano.keyUp({ midi: pitch });
+                this.keyUp(pitch);
             }
 
             this.pendingOffsets.delete(pitch);
@@ -198,4 +215,10 @@ export class Player {
     }
 }
 
-export const player = new Player();
+let player: Player | null = null
+export const getPlayer = () => {
+    if (!player) {
+        player = new Player();
+    }
+    return player;
+}

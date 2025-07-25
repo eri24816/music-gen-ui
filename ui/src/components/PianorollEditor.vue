@@ -1,5 +1,5 @@
 <template>
-    <div class="pianoroll-editor"  @keydown.space.prevent="playOrStop" @wheel="handleWheel" ref="editorDiv">
+    <div class="pianoroll-editor"  @wheel="handleWheel" ref="editorDiv">
         <canvas class="pianoroll-canvas" ref="pianorollCanvas" @dragover="handleDragOver" @mousedown="handleMouseDown"
             @contextmenu.prevent></canvas>
         <!--
@@ -23,7 +23,7 @@
 import { ref, onMounted, onUnmounted, watch, computed } from "vue"
 import type { Ref } from "vue"
 import { labToRgbString, Note, Pianoroll } from "@/utils"
-import { player } from "@/player"
+import { getPlayer } from "@/player"
 import type { INote } from "@/player"
 
 import { Midi } from "@tonejs/midi/src/Midi";
@@ -82,6 +82,7 @@ let overrideBps: number | null = null
 let selectionBox: { x: number, y: number, width: number, height: number } | null = null
 let selectedNotes: Note[] = []
 let selectedRange: { start: number, end: number } | null = null
+let player = getPlayer()
 
 onMounted(async () => {
     minPitch = props.minPitch ?? 0
@@ -133,13 +134,7 @@ const getSelectionBox = () => {
     return {x:selectionBox.x, y:selectionBox.y, width:selectionBox.width, height:selectionBox.height}
 }
 
-const setSelectedRange = (start: number, end: number) => {
-    selectedRange = { start: start, end: end }
-    if (!isPlaying.value) {
-        cursorPosition = start
-    }
-    render()
-}
+
 
 const unselectRange = () => {
     selectedRange = null
@@ -328,7 +323,7 @@ class SelectionDragBehavior implements DragBehavior {
             let endBar = Math.min(10000, Math.ceil(Math.max(this._x, this._x + this._width) / 4) * 4)
             setSelectionBox({ x: startBar, y: minPitch - 1, width: endBar - startBar, height: maxPitch - minPitch + 1 })
 
-            setSelectedRange(startBar, endBar)
+            selectRange({start: startBar, end: endBar})
             emit("select-range", startBar, endBar)
         }
 
@@ -874,8 +869,6 @@ const _play = (): void => {
             stop()
             if (selectedRange) {
                 cursorPosition = selectedRange.start
-            } else {
-                cursorPosition = 0
             }
             render()
         }
@@ -883,7 +876,6 @@ const _play = (): void => {
 }
 
 const _stop = (): void => {
-    console.log("stopping")
     if (intervalId) {
         clearInterval(intervalId)
         intervalId = null
@@ -978,11 +970,25 @@ function setBps(newBps: number|null) {
 
 function selectRange(range: { start: number, end: number }) {
     setSelectionBox({ x: range.start, y: minPitch - 1, width: range.end - range.start, height: maxPitch - minPitch + 1 })
-    setSelectedRange(range.start, range.end)
+    selectedNotes = pianoroll.getNotesBetween(range.start, range.end, false)
+    selectedRange = { start: range.start, end: range.end }
+    if (!isPlaying.value) {
+        cursorPosition = range.start
+    }
+    render()
 }
 
 const getPianoroll = (): Pianoroll => {
     return pianoroll
+}
+
+const handleDelete = (e: KeyboardEvent) => {
+    for (const note of selectedNotes) {
+        pianoroll.removeNote(note)
+    }
+    emit("edit", [], selectedNotes)
+    render()
+    
 }
 
 //expose loadMidiFile to parent
@@ -1002,6 +1008,7 @@ defineExpose({
     screenToPitch,
     render,
     updatePlayerNotes,
+    handleDelete
 })
 </script>
 

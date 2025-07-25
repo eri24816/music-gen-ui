@@ -117,9 +117,9 @@ export class Pianoroll {
      * @param {number} end - The end beat.
      * @returns {Note[]} An array of notes that are between the start and end beats.
      */
-    getNotesBetween(start: number, end: number): Note[] {
+    getNotesBetween(start: number, end: number, considerEnd: boolean = true): Note[] {
         return this.notes.filter(
-            (note) => note.onset < end && note.onset + note.duration >= start,
+            (note) => note.onset < end && (considerEnd ? note.onset + note.duration >= start : note.onset >= start),
         );
     }
 

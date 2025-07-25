@@ -83,10 +83,12 @@ const handleAssetBlur = (id: string) => {
 
 let startX: number|null = null
 let startY: number | null = null
+let mouseMoved = false
 
 const handleAssetMouseDown = (asset: Asset) => {
 
     draggingAsset.value = asset
+    mouseMoved = false
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleMouseUp)
 }
@@ -95,13 +97,12 @@ const handleMouseMove = (e: MouseEvent) => {
     if (!draggingAssetEl.value) {
         return
     }
+    mouseMoved = true
     if (startX === null) {
         startX = e.clientX - assetEls.value[draggingAsset.value!.id]!.getBoundingClientRect().left
-        console.log(startX)
     }
     if (startY === null) {
         startY = e.clientY - assetEls.value[draggingAsset.value!.id]!.getBoundingClientRect().top
-        console.log(startY)
     }
     // move the asset to the mouse position
     const rect = draggingAssetEl.value!.getBoundingClientRect()
@@ -115,7 +116,9 @@ const handleMouseMove = (e: MouseEvent) => {
 const handleMouseUp = (e: MouseEvent) => {
     document.removeEventListener('mousemove', handleMouseMove)
     document.removeEventListener('mouseup', handleMouseUp)
-    emit('drag-asset-end', editors.value[draggingAsset.value!.id].getPianoroll(),e )
+    if (mouseMoved) {
+        emit('drag-asset-end', editors.value[draggingAsset.value!.id].getPianoroll(),e )
+    }
     draggingAsset.value = null
 }
 

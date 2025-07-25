@@ -39,7 +39,7 @@ model:
 
 training:
   seed: 0x517
-  batch_size: 12
+  batch_size: 6
   accum_batches: 1
   shuffle: true
   drop_last: true

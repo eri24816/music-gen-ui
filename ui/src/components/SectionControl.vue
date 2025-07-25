@@ -10,7 +10,7 @@
             }"
         >
             <span v-if="!editingIndex[index]" @dblclick="startEditing(index)">
-                {{section.label}} ({{section.end - section.start}})
+                {{section.label}} ({{section.end - section.start}}) {{section.isSeed ? '(Seed)' : ''}}
             </span>
             <div v-else class="edit-container">
                 <input
@@ -46,7 +46,7 @@ import { ref, computed, nextTick } from 'vue'
 
 const props = defineProps<{
     scaleX: number,
-    sections: { start: number, end: number, label: string }[]
+    sections: { start: number, end: number, label: string, isSeed: boolean }[]
 }>()
 
 const colorPresets = [
