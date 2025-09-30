@@ -3,21 +3,22 @@
         <div class="left-bar-content">
             <div class="left-bar-section">
                 <h1>Assets</h1>
+                <p>Try dragging one asset to the seed segment and compose around it.</p>
                 <div class="asset-list">
-                    <div class="asset-item" v-for="asset in assets" :key="asset.id" @contextmenu.prevent="assetContextMenu(asset)" tabindex="0" @keydown.delete="deleteAsset(asset.id)" @blur="handleAssetBlur(asset.id)" @mousedown="handleAssetMouseDown(asset)" :ref="(el: any) => (el ? assetEls[asset.id] = el : delete assetEls[asset.id])">
+                    <div class="asset-item" v-for="asset in assets" :key="asset.id" @contextmenu.prevent="assetContextMenu(asset)" tabindex="0" @blur="handleAssetBlur(asset.id)" @mousedown="handleAssetMouseDown(asset)" :ref="(el: any) => (el ? assetEls[asset.id] = el : delete assetEls[asset.id])">
                         <span>{{ asset.name }}</span>
                         <PianorollEditor :midi="asset.midi" :interactive="false" display="simple" @click="editors[asset.id].playOrStop()" :ref="(el: any) => (el ? editors[asset.id] = el : delete editors[asset.id])" />
                     </div>
                 </div>
-                <button @click="addAsset">+</button>
+                <button @click="addAsset">Add from disk</button>
             </div>
-            <div class="left-bar-section">
+            <!-- <div class="left-bar-section">
                 <h1>Suggestions</h1>
                 <button>+</button>
-            </div>
+            </div> -->
         </div>
 
-        <FooterComp class="footer"/>
+       <!-- <FooterComp class="footer"/> -->
 
         <div class="asset-item dragging-asset" v-if="draggingAsset" ref="draggingAssetEl">
             <span>{{ draggingAsset.name }}</span>
@@ -122,6 +123,16 @@ const handleMouseUp = (e: MouseEvent) => {
     draggingAsset.value = null
 }
 
+onMounted(async () => {
+    const response = await fetch('/api/default_assets/')
+    const fileNames: string[] = await response.json()
+    for (const fileName of fileNames) {
+        const response = await fetch(`/api/default_assets/${fileName}`)
+        const midi = await response.arrayBuffer()
+        const file = new File([midi], fileName, { type: 'audio/midi' })
+        assets.value.push({ name: fileName, midi: file, id: uuidv4() })
+    }
+})
 </script>
 
 <style scoped>
@@ -146,7 +157,7 @@ h1 {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    max-height: 70vh;
+    max-height: 90vh;
 }
 
 .asset-list {
@@ -155,6 +166,7 @@ h1 {
     gap: 10px;
     overflow-y: auto;
     padding: 2px;
+    min-height: 0;
 }
 
 .asset-item {

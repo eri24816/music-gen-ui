@@ -22,7 +22,7 @@ export default defineConfig({
         changeOrigin: true,
       }
     },
-    allowedHosts: ['*']
+    allowedHosts: ['*', 'segmented-full-song-ui.wdwd.dev']
   },
   define: {
     // By default, Vite doesn't include shims for NodeJS/

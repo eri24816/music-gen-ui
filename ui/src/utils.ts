@@ -62,7 +62,7 @@ export class Pianoroll {
     constructor(midiData: ArrayBuffer | Uint8Array | null = null) {
         if (!midiData) {
             this.notes = [];
-            this.bps = 120 / 60;
+            this.bps = 108 / 60;
             return;
         }
         this.midiData = midiData;
@@ -87,13 +87,13 @@ export class Pianoroll {
     toMidi(): Midi {
         const midi = new Midi();
         midi.addTrack();
+        midi.header.tempos.push({ bpm: this.bps * 60, time: 0, ticks: 0 });
         if (this.midiData) {
             const oldMidi = new Midi(this.midiData);
             midi.header = oldMidi.header;
         }
         midi.header.update();
         const ticksPerSecond = midi.header.secondsToTicks(1);
-        this.bps = getBps(midi);
 
         for (const note of this.notes) {
             // Do not use time/duration in the addNote function. It incorrectly calculates the ticks.

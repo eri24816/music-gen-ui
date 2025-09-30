@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 
 export const useStore = defineStore('store', () => {
-    const bps = ref(2)
+    const bps = ref(108/60)
     const volume = ref(0.5)
     const midiPort = ref<MIDIOutput | null>(null)
     const useMidiOut = ref(false)

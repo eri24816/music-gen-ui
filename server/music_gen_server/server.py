@@ -1,7 +1,9 @@
 import asyncio
 import json
+import os
+from pathlib import Path
 from typing import AsyncGenerator
-from fastapi import FastAPI, Form, UploadFile
+from fastapi import FastAPI, Form, UploadFile, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 import miditoolkit.midi.parser
 from pydantic import BaseModel
@@ -22,7 +24,7 @@ class GenerateParams(BaseModel):
     segments: list[SegmentInfo]
     song_duration: int
 class MusicGenServer:
-    def __init__(self, frontend_dir: str='ui/dist'):
+    def __init__(self, frontend_dir: str='../ui/dist'):
         self._app = FastAPI()
         self._frontend_dir = frontend_dir
         self._setup_routes()
@@ -38,6 +40,8 @@ class MusicGenServer:
     
     def _setup_routes(self):
         """Setup the routes for the server"""
+        self._app.get("/api/default_assets/")(self._get_default_assets_root)
+        self._app.get("/api/default_assets/{file_name}")(self._get_default_assets)
         self._app.get("/{path:path}")(self.read_file)
         self._app.post("/api/generate/")(self._generate)
 
@@ -45,7 +49,16 @@ class MusicGenServer:
     
     def read_file(self, path: str):
         """Regular file serving"""
-        return FileResponse(path=f'{self._frontend_dir}/{path}')
+        if path == "":
+            path = "index.html"
+        print(f"path: {path}")
+        # prevent path traversal
+        path_ = (Path(self._frontend_dir) / path).resolve()
+        if not path_.is_relative_to(Path(self._frontend_dir).resolve()):
+            print(f"invalid path: {path_}")
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        return FileResponse(path=path_)
     
     async def _generate(self, midi_file: UploadFile, params: str= Form(), client_id: str= Form()):
         print(f"client_id: {client_id}")
@@ -69,3 +82,21 @@ class MusicGenServer:
     # abstract methods
     async def generate(self, midi: miditoolkit.midi.parser.MidiFile, params: GenerateParams, cancel_event: asyncio.Event) -> AsyncGenerator[tuple[float, int, int, float], None]:
         raise NotImplementedError("Not implemented")
+
+    def _get_default_assets_root(self):
+        '''
+        Return all file names in the ./default_assets directory
+        '''
+        return [f for f in os.listdir('default_assets') if f.endswith('.mid')]
+        
+
+    def _get_default_assets(self, file_name: str):
+        '''
+        Return the content of the midi file
+        '''
+        path = Path('default_assets') / file_name
+        # prevent path traversal
+        path = path.resolve()
+        if not path.parent == Path('default_assets').resolve():
+            raise HTTPException(status_code=404, detail="File not found")
+        return FileResponse(path=path)    

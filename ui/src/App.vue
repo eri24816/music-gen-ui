@@ -1,5 +1,5 @@
 <template>
-    <div class="main" tabindex="0" @keydown="handleKeyDown" @wheel.prevent>
+    <div class="main" tabindex="0" @wheel="handleWheel">
         <div class="center-container">
             <div class="editor-container">
                 <PianorollEditor ref="editor" :editable="true" class="editor" @transform="handleEditorTransform" @select-range="handleEditorSelectRange" @unselect-range="handleUnselectRange" :min-pitch="21" :max-pitch="108"/>
@@ -18,10 +18,12 @@
                     class="toolbox"
                 />
             </div>
-            <SettingsPanel class="settings-panel" @load-midi="handleLoadMidi" @save-midi="handleSaveMidi" />
+            <SettingsPanel class="settings-panel" @load-midi="handleLoadMidi" @save-midi="handleSaveMidi" @open-guide="userGuide!.openGuide()" />
         </div>
         <LeftBar @drag-asset="handleDragAsset" @drag-asset-end="handleDragAssetEnd" />
     </div>
+
+    <UserGuide ref="userGuide" />
 </template>
 
 <script setup lang="ts">
@@ -38,6 +40,10 @@ import { generate } from './api'
 import RangeSelect from './components/RangeSelect.vue'
 import type { Pianoroll } from './utils'
 import { Note } from './utils'
+import UserGuide from './components/UserGuide.vue'
+
+
+const userGuide = ref<InstanceType<typeof UserGuide>>()
 
 const editor = ref<InstanceType<typeof PianorollEditor>>()
 const shiftWithEditor = ref<HTMLDivElement>()
@@ -79,6 +85,10 @@ watch(() => store.bps, (newBps) => {
 
 watch(() => store.volume, (newVolume) => {
     getPlayer().setVolume(newVolume)
+})
+
+onMounted(() => {
+    document.addEventListener("keydown", handleKeyDown)
 })
 
 const toolboxVisible = ref(false)
@@ -154,25 +164,29 @@ function handleToolSelected(toolName: string) {
                 const { done, value } = await reader.read()
                 if (done) break
 
-                const noteData = JSON.parse(decoder.decode(value))
-                let duration = 0
-                if (noteData[3] == 0) {
-                    duration = 32 - noteData[0] % 32
-                } else {
-                    duration = noteData[3]
-                }
-                const pitch = noteData[1]
-                const note = new Note(noteData[0] / 8, duration / 8, noteData[1], noteData[2])
+                for (const line of decoder.decode(value).split("\n")) {
+                    if (line == "") continue
+                    const noteData = JSON.parse(line)
 
-                const last = lastNoteOfPitch.get(pitch)
-                if (last) {
-                    if(last.onset + last.duration > note.onset) {
-                        last.duration = note.onset - last.onset
+                    let duration = 0
+                    if (noteData[3] == 0) {
+                        duration = 32 - noteData[0] % 32
+                    } else {
+                        duration = noteData[3]
                     }
-                }
+                    const pitch = noteData[1]
+                    const note = new Note(noteData[0] / 8, duration / 8, noteData[1], noteData[2])
 
-                pianoroll.addNote(note)
-                lastNoteOfPitch.set(noteData[1], note)
+                    const last = lastNoteOfPitch.get(pitch)
+                    if (last) {
+                        if (last.onset + last.duration > note.onset) {
+                            last.duration = note.onset - last.onset
+                        }
+                    }
+
+                    pianoroll.addNote(note)
+                    lastNoteOfPitch.set(noteData[1], note)
+                }
                 editor.value!.render()
                 editor.value!.updatePlayerNotes()
             }
@@ -201,6 +215,12 @@ function handleToolSelected(toolName: string) {
     }
 
     
+}
+
+function handleWheel(event: WheelEvent) {
+    if (event.ctrlKey) {
+        event.preventDefault(); // Only prevent default when Ctrl is pressed
+    }
 }
 
 function handleKeyDown(event: KeyboardEvent) {
@@ -284,6 +304,7 @@ function handleSaveMidi() {
 
 .editor-container {
     position: relative;
+    z-index: 10;
 }
 
 h2 {
@@ -306,7 +327,7 @@ h2 {
     
     position: absolute;
     height: 40px;
-    width: 10000px;
+    width: 100000px;
 }
 
 .shift-with-editor-container {
