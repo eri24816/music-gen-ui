@@ -216,6 +216,7 @@ export class Pianoroll {
         for (const note of other.notes) {
             this.addNote(new Note(note.onset + shift, note.duration, note.pitch, note.velocity))
         }
+        this.recalculateDuration();
     }
 }
 

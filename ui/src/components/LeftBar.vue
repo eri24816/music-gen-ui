@@ -12,13 +12,9 @@
                 </div>
                 <button @click="addAsset">Add from disk</button>
             </div>
-            <!-- <div class="left-bar-section">
-                <h1>Suggestions</h1>
-                <button>+</button>
-            </div> -->
         </div>
 
-       <!-- <FooterComp class="footer"/> -->
+       <FooterComp class="footer"/>
 
         <div class="asset-item dragging-asset" v-if="draggingAsset" ref="draggingAssetEl">
             <span>{{ draggingAsset.name }}</span>
@@ -191,5 +187,6 @@ h1 {
     width: 300px;
     outline: 1px solid #4AA945;
     opacity: 0.5;
+    z-index: 1000;
 }
 </style>

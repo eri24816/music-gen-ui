@@ -50,7 +50,7 @@ const position = computed(() => ({
 
 .tool-button {
     padding: 4px 16px;
-    background: #216b2c;
+    background: #216b2c6c;
     color: white;
     border: none;
     border-radius: 4px;

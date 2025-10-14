@@ -140,7 +140,10 @@ const getSelectionBox = () => {
 
 const unselectRange = () => {
     selectedRange = null
+    selectedNotes = []
+    setSelectionBox(null)
     emit("unselect-range", 0, 0)
+    render()
 }
 
 const bps = (() => overrideBps ?? pianoroll.bps)
@@ -306,10 +309,8 @@ class RemoveNoteDragBehavior implements DragBehavior {
         if (selectedNotes.length > 0) {
             emit("unselect-notes", selectedNotes)
         }
-        selectedNotes = []
-        setSelectionBox(null)
+
         unselectRange()
-        render()
     }
     public mouseMove(event: MouseEvent): void {
         const noteUnderPointer = pianoroll.getNoteAt(
@@ -748,12 +749,15 @@ const getNoteNameFromPitch = (pitch: number): string => {
     return noteNames[pitch % 12] + (Math.floor(pitch / 12) - 1)
 }
 
-const getCursorCanvasPosition = (): number => {
+const getCursorCanvasPosition = (clamp: boolean = true): number => {
     let pixel = beatToCanvas(cursorPosition)
-    return Math.min(
+    if (clamp) {
+        return Math.min(
         Math.max(pixel, 5),
         pianorollCanvas.value!.clientWidth,
-    )
+        )
+    }
+    return pixel
 }
 
 const beatToCanvas = (beat: number): number => {
@@ -811,25 +815,24 @@ const handleWheel = (event: WheelEvent): void => {
     event.preventDefault()
 
     if (event.ctrlKey) {
-        let oldPianorollXUnderMouse =
-            (event.clientX -
-                pianorollCanvas.value!.getBoundingClientRect().left) /
+        scaleByPivot((event.clientX - pianorollCanvas.value!.getBoundingClientRect().left) /
             scaleX -
-            shiftX
-        scaleX *= Math.exp(event.deltaY / -700)
-        scaleX = Math.max(scaleX, 4)
-        shiftX =
-            (event.clientX -
-                pianorollCanvas.value!.getBoundingClientRect().left) /
-            scaleX -
-            oldPianorollXUnderMouse
-        shiftX = Math.min(shiftX, 100 / scaleX)
+            shiftX,
+            Math.exp(event.deltaY / -700))
         event.preventDefault()
     } else {
         shiftX -= (1 * (event.deltaY + event.deltaX)) / scaleX
         shiftX = Math.min(shiftX, 100 / scaleX)
     }
     render()
+}
+
+const scaleByPivot = (pivot: number, scale: number) => {
+    oldScaleX = scaleX
+    scaleX *= scale
+    scaleX = Math.max(scaleX, 4)
+    shiftX = (pivot + shiftX) * oldScaleX / scaleX - pivot
+    shiftX = Math.min(shiftX, 100 / scaleX)
 }
 
 const handleMouseDown = (event: MouseEvent): void => {
@@ -870,14 +873,12 @@ const handleMouseDown = (event: MouseEvent): void => {
 }
 
 const setPointerStyle = (style: "col-resize" | "default"): void => {
-    console.log(style)
     if (editorDiv.value) {
         editorDiv.value.style.cursor = style
     }
 }
 
 const handleMouseMove = (event: MouseEvent): void => {
-    console.log("handleMouseMove")
     if (isDragging) {
         dragBehavior?.mouseMove(event)
     }
@@ -1009,8 +1010,9 @@ const keepCursorInScreen = (): void => {
         return
     }
     const margin = Math.min(pianorollCanvas.value!.clientWidth * 0.2, 200)
-    const targetCursorX = Math.min(Math.max(margin * 0.2, getCursorCanvasPosition()), pianorollCanvas.value!.clientWidth - margin)
-    shiftX += (targetCursorX - getCursorCanvasPosition()) / scaleX
+    const targetCursorX = Math.min(Math.max(margin, getCursorCanvasPosition(false)), pianorollCanvas.value!.clientWidth - margin)
+    console.log(targetCursorX, getCursorCanvasPosition(false))
+    shiftX += (targetCursorX - getCursorCanvasPosition(false)) / scaleX
 }
 
 const getMidi = (): File => {
@@ -1041,12 +1043,14 @@ const clear = (): void => {
     render()
 }
 
-const inBounds = (x: number, y: number): boolean => {
+
+const isMouseInEditor = (x: number, y: number): boolean => {
+    const rect = pianorollCanvas.value!.getBoundingClientRect()
     return (
-        x >= 0 &&
-        x < pianorollCanvas.value!.clientWidth &&
-        y >= 0 &&
-        y < pianorollCanvas.value!.clientHeight
+        x >= rect.left &&
+        x < rect.left + rect.width &&
+        y >= rect.top &&
+        y < rect.top + rect.height
     )
 }
 
@@ -1088,7 +1092,28 @@ const handleDelete = (e: KeyboardEvent) => {
     }
     emit("edit", [], selectedNotes)
     render()
+    updatePlayerNotes()
+}
 
+const addNote = (note: Note) => {
+    pianoroll.addNote(note)
+    if (selectedRange && note.onset >= selectedRange.start && note.onset <= selectedRange.end) {
+        selectedNotes.push(note)
+    }
+}
+
+const overlap = (anotherPianoroll: Pianoroll, shift: number) => {
+    for (const note of anotherPianoroll.getNotes()) {
+        const newNote = new Note(note.onset + shift, note.duration, note.pitch, note.velocity)
+        pianoroll.addNote(newNote)
+        if (selectedRange && newNote.onset >= selectedRange.start && newNote.onset <= selectedRange.end) {
+            selectedNotes.push(newNote)
+        }
+    }
+}
+
+const getCursorPosition = (): number => {
+    return cursorPosition
 }
 
 //expose loadMidiFile to parent
@@ -1109,7 +1134,14 @@ defineExpose({
     render,
     updatePlayerNotes,
     handleDelete,
-    toMidiFile
+    toMidiFile,
+    isMouseInEditor,
+    addNote,
+    overlap,
+    unselectRange,
+    scaleByPivot,
+    getCursorPosition,
+    keepCursorInScreen
 })
 </script>
 

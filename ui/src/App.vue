@@ -2,23 +2,21 @@
     <div class="main" tabindex="0" @wheel="handleWheel">
         <div class="center-container">
             <div class="editor-container">
-                <PianorollEditor ref="editor" :editable="true" class="editor" @transform="handleEditorTransform" @select-range="handleEditorSelectRange" @unselect-range="handleUnselectRange" :min-pitch="21" :max-pitch="108"/>
+                <PianorollEditor ref="editor" :editable="true" class="editor" @transform="handleEditorTransform"
+                    @select-range="handleEditorSelectRange" @unselect-range="handleUnselectRange" :min-pitch="21"
+                    :max-pitch="108" />
                 <div class="shift-with-editor-container">
-                    <div class="shift-with-editor" ref="shiftWithEditor" >
-                        <RangeSelect :scaleX="scaleX" class="range-select" ref="rangeSelect" @select="handleSelectRange"/>
-                        <SectionControl :sections="sections" :scaleX="scaleX" class="section-control"/>
+                    <div class="shift-with-editor" ref="shiftWithEditor">
+                        <RangeSelect :scaleX="scaleX" class="range-select" ref="rangeSelect"
+                            @select="handleSelectRange" />
+                        <SectionControl :sections="sections" :scaleX="scaleX" class="section-control" />
                     </div>
                 </div>
-                <ToolBox 
-                    v-if="toolboxVisible"
-                    :x="toolboxPosition.x"
-                    :y="toolboxPosition.y"
-                    :tools="tools"
-                    @tool-selected="handleToolSelected"
-                    class="toolbox"
-                />
+                <ToolBox v-if="toolboxVisible" :x="toolboxPosition.x" :y="toolboxPosition.y" :tools="tools"
+                    @tool-selected="handleToolSelected" class="toolbox" />
             </div>
-            <SettingsPanel class="settings-panel" @load-midi="handleLoadMidi" @save-midi="handleSaveMidi" @open-guide="userGuide!.openGuide()" />
+            <SettingsPanel class="settings-panel" @load-midi="handleLoadMidi" @save-midi="handleSaveMidi"
+                @open-guide="userGuide!.openGuide()" />
         </div>
         <LeftBar @drag-asset="handleDragAsset" @drag-asset-end="handleDragAssetEnd" />
     </div>
@@ -65,7 +63,7 @@ for (const section of defaultSectionString.split(" ")) {
 }
 
 function handleEditorTransform(transform: { scaleX: number, shiftX: number }) {
-    shiftWithEditor.value!.style.transform = `translate(${transform.shiftX*transform.scaleX}px, 0px)`
+    shiftWithEditor.value!.style.transform = `translate(${transform.shiftX * transform.scaleX}px, 0px)`
     scaleX.value = transform.scaleX
     shiftX.value = transform.shiftX
 }
@@ -128,70 +126,76 @@ function handleUnselectRange(range: { start: number, end: number }) {
     selectedRange.value = null
 }
 
+function handleGenerate() {
+
+    const selection = editor.value?.getSelectionBox()!
+    console.log('Generate requested for area:', selection)
+    generate(editor.value!.getMidi(), {
+        range_to_generate: {
+            start_beat: selection.x,
+            end_beat: selection.x + selection.width
+        },
+        segments: sections.value.map(s => ({
+            start_bar: s.start,
+            end_bar: s.end,
+            label: s.label,
+            is_seed: s.isSeed
+        })),
+        song_duration: sections.value.reduce((max, s) => Math.max(max, s.end), 0) * 32
+    }).then(async (response: Response) => {
+        const reader = response.body!.getReader()
+        const decoder = new TextDecoder()
+
+        // Clear the existing notes in the range
+        const pianoroll = editor.value!.getPianoroll()
+        const notesToRemove = pianoroll.getNotesOnsetBetween(selection.x, selection.x + selection.width)
+        for (const note of notesToRemove) {
+            pianoroll.removeNote(note)
+        }
+
+        const lastNoteOfPitch = new Map<number, Note>()
+        while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            for (const line of decoder.decode(value).split("\n")) {
+                if (line == "") continue
+                const noteData = JSON.parse(line)
+
+                let duration = 0
+                if (noteData[3] == 0) {
+                    duration = 32 - noteData[0] % 32
+                } else {
+                    duration = noteData[3]
+                }
+                const pitch = noteData[1]
+                const note = new Note(noteData[0] / 8, duration / 8, noteData[1], noteData[2])
+
+                const last = lastNoteOfPitch.get(pitch)
+                if (last) {
+                    if (last.onset + last.duration > note.onset) {
+                        last.duration = note.onset - last.onset
+                    }
+                }
+
+                editor.value!.addNote(note)
+                lastNoteOfPitch.set(noteData[1], note)
+            }
+            editor.value!.render()
+            editor.value!.updatePlayerNotes()
+        }
+    })
+}
+
+
 function handleToolSelected(toolName: string) {
     const selection = editor.value?.getSelectionBox()
     if (!selection) return
-    
+
     // Handle tool actions
     if (toolName === 'generate') {
         // Emit or handle generate action
-        console.log('Generate requested for area:', selection)
-        generate(editor.value!.getMidi(), {
-            range_to_generate: { 
-                start_beat: selection.x, 
-                end_beat: selection.x + selection.width
-            },
-            segments: sections.value.map(s => ({
-                start_bar: s.start,
-                end_bar: s.end,
-                label: s.label,
-                is_seed: s.isSeed
-            })),
-            song_duration: sections.value.reduce((max, s) => Math.max(max, s.end), 0)*32
-        }).then(async (response: Response) => {
-            const reader = response.body!.getReader()
-            const decoder = new TextDecoder()
-            
-            // Clear the existing notes in the range
-            const pianoroll = editor.value!.getPianoroll()
-            const notesToRemove = pianoroll.getNotesOnsetBetween(selection.x, selection.x + selection.width)
-            for (const note of notesToRemove) {
-                pianoroll.removeNote(note)
-            }
-
-            const lastNoteOfPitch = new Map<number, Note>()
-            while (true) {
-                const { done, value } = await reader.read()
-                if (done) break
-
-                for (const line of decoder.decode(value).split("\n")) {
-                    if (line == "") continue
-                    const noteData = JSON.parse(line)
-
-                    let duration = 0
-                    if (noteData[3] == 0) {
-                        duration = 32 - noteData[0] % 32
-                    } else {
-                        duration = noteData[3]
-                    }
-                    const pitch = noteData[1]
-                    const note = new Note(noteData[0] / 8, duration / 8, noteData[1], noteData[2])
-
-                    const last = lastNoteOfPitch.get(pitch)
-                    if (last) {
-                        if (last.onset + last.duration > note.onset) {
-                            last.duration = note.onset - last.onset
-                        }
-                    }
-
-                    pianoroll.addNote(note)
-                    lastNoteOfPitch.set(noteData[1], note)
-                }
-                editor.value!.render()
-                editor.value!.updatePlayerNotes()
-            }
-        })
-
+        handleGenerate()
     } else if (toolName === 'add-section') {
         // check if any section is overlapping with the selection
         for (const section of sections.value) {
@@ -214,37 +218,120 @@ function handleToolSelected(toolName: string) {
         }
     }
 
-    
+
 }
 
 function handleWheel(event: WheelEvent) {
     if (event.ctrlKey) {
-        event.preventDefault(); // Only prevent default when Ctrl is pressed
+        event.preventDefault() // Only prevent default when Ctrl is pressed
     }
 }
 
 function handleKeyDown(event: KeyboardEvent) {
     if (event.code === 'Space') {
-        event.preventDefault(); // Prevent page scroll
+        event.preventDefault() // Prevent page scroll
         editor.value?.playOrStop()
     } else if (event.code === 'Delete') {
         editor.value?.handleDelete(event)
+    } else if (event.code === 'KeyG') {
+        handleGenerate()
+    } else if (event.code === 'ArrowLeft') {
+        if (selectedRange.value === null) {
+            let start = editor.value!.getCursorPosition()
+            // round to 4
+            start = Math.round(start / 4) * 4
+            setSelectedRange(start, start + 4)
+            editor.value!.render()
+            return
+        }
+        let newStart = 0
+        let newEnd = 0
+        if (event.ctrlKey) {
+            newStart = selectedRange.value!.start
+            newEnd = selectedRange.value!.end - 4
+        }
+        else {
+            newStart = selectedRange.value!.start - 4
+            newEnd = selectedRange.value!.end - 4
+        }
+        if (newStart >= 0 && newEnd > newStart) {
+            setSelectedRange(newStart, newEnd)
+            editor.value!.keepCursorInScreen()
+            editor.value!.render()
+        }
+    } else if (event.code === 'ArrowRight') {
+        if (selectedRange.value === null) {
+            let start = editor.value!.getCursorPosition()
+            // round to 4
+            start = Math.round(start / 4) * 4
+            setSelectedRange(start, start + 4)
+            editor.value!.render()
+            return
+        }
+        let newStart = 0
+        let newEnd = 0
+        if (event.ctrlKey) {
+            newStart = selectedRange.value!.start
+            newEnd = selectedRange.value!.end + 4
+        }
+        else {
+            newStart = selectedRange.value!.start + 4
+            newEnd = selectedRange.value!.end + 4
+        }
+        if (newStart >= 0 && newEnd > newStart) {
+            setSelectedRange(newStart, newEnd)
+            editor.value!.keepCursorInScreen()
+            editor.value!.render()
+        }
     }
+    else if (event.code === 'ArrowUp') {
+        if (selectedRange.value === null) {
+            editor.value!.scaleByPivot(editor.value!.getCursorPosition(), 1.1)
+            editor.value!.render()
+            return
+        }
+        editor.value!.scaleByPivot((selectedRange.value!.start + selectedRange.value!.end) / 2, 1.1)
+        editor.value!.render()
+    } else if (event.code === 'ArrowDown') {
+        if (selectedRange.value === null) {
+            editor.value!.scaleByPivot(editor.value!.getCursorPosition(), 1 / 1.1)
+            editor.value!.render()
+            return
+        }
+        editor.value!.scaleByPivot((selectedRange.value!.start + selectedRange.value!.end) / 2, 1/1.1)
+        editor.value!.render()
+    }
+    else if (event.code === 'Escape') {
+        unSelect()
+    }
+}
+
+function setSelectedRange(start: number, end: number) {
+    editor.value!.selectRange({ start: start, end: end })
+    rangeSelect.value!.setRange({ start: start, end: end })
+    selectedRange.value = { start: start, end: end }
+}
+
+function unSelect() {
+    editor.value!.unselectRange()
+    rangeSelect.value!.unselect()
+    selectedRange.value = null
 }
 
 function handleDragAsset(pianoroll: Pianoroll, mouseEvent: MouseEvent) {
     // try to fit the asset into the editor
-    const startBeat = Math.round(editor.value!.screenToBeat(mouseEvent.clientX)/4) * 4
+    if (!editor.value!.isMouseInEditor(mouseEvent.clientX, mouseEvent.clientY)) {
+        return
+    }
+    const startBeat = Math.round(editor.value!.screenToBeat(mouseEvent.clientX) / 4) * 4
     const endBeat = startBeat + pianoroll.duration
-    editor.value!.selectRange({ start: startBeat, end: endBeat })
-    rangeSelect.value!.setRange({ start: startBeat, end: endBeat })
-    selectedRange.value = { start: startBeat, end: endBeat }
-    ShowToolbox()
+    setSelectedRange(startBeat, endBeat)
 }
 
 function handleDragAssetEnd(pianoroll: Pianoroll, mouseEvent: MouseEvent) {
     // add the asset to the editor
-    editor.value!.getPianoroll().overlap(pianoroll, Math.round(editor.value!.screenToBeat(mouseEvent.clientX) / 4) * 4)
+
+    editor.value!.overlap(pianoroll, Math.round(editor.value!.screenToBeat(mouseEvent.clientX) / 4) * 4)
     editor.value!.render()
 }
 
@@ -263,10 +350,10 @@ function handleLoadMidi() {
 
 function handleSaveMidi() {
     editor.value!.toMidiFile().then(file => {
-    const url = URL.createObjectURL(file)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = file.name
+        const url = URL.createObjectURL(file)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = file.name
         a.click()
         URL.revokeObjectURL(url)
     })
@@ -279,7 +366,8 @@ function handleSaveMidi() {
     flex-direction: row;
     background-color: #1D1D1D;
     flex: 1;
-    outline: none; /* Remove focus outline if desired */
+    outline: none;
+    /* Remove focus outline if desired */
 }
 
 .left-bar {
@@ -324,7 +412,7 @@ h2 {
 }
 
 .shift-with-editor {
-    
+
     position: absolute;
     height: 40px;
     width: 100000px;
@@ -357,5 +445,4 @@ h2 {
     height: 20px;
     background-color: #000000;
 }
-
 </style>

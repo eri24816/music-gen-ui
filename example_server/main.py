@@ -67,7 +67,7 @@ class SegmentFullSongMusicGenServer(MusicGenServer):
  
         def thread_task():
             try: 
-                self.model.generate(segments, existing_pianoroll=pr, target_start_bar=params.range_to_generate.start_beat // beats_per_bar, target_end_bar=params.range_to_generate.end_beat // beats_per_bar, generate_note_callback=generate_note_callback, seed_start_bar=seed_start_bar)
+                self.model.generate(segments, existing_pianoroll=pr, target_start_bar=params.range_to_generate.start_beat // beats_per_bar, target_end_bar=params.range_to_generate.end_beat // beats_per_bar, generate_note_callback=generate_note_callback, seed_start_bar=seed_start_bar,top_p=0.97)
 
             except Exception:
                 traceback.print_exc()
